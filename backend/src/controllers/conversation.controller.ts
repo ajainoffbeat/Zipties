@@ -1,6 +1,8 @@
 import type { Request, Response } from "express";
 import * as chatService from "../services/chat.service.js";
 import * as socketService from "../services/socket.service.js";
+import { Filter } from "bad-words";
+
 import type {
   CreateConversationRequest,
   SendMessageRequest,
@@ -51,16 +53,16 @@ export const sendMessage = async (req: Request, res: Response) => {
   try {
     const { conversation_id, content, content_type_name } =
       req.body as SendMessageRequest;
+    const customFilter = new Filter({ placeHolder: 'x' })
+    const filtered_message=customFilter.clean(content)
     const token = extractBearerToken(req.headers.authorization);
     const {userId} = decodeToken(token);
     console.log("sendMessage function called",userId)
     const username = (req as any).user?.username || "Unknown";
-
-    // 1. Save message to DB via stored function
     const messageId = await chatService.sendMessage(
       conversation_id,
       userId,
-      content,
+      filtered_message,
       content_type_name || "text",
     );
 
@@ -70,7 +72,7 @@ export const sendMessage = async (req: Request, res: Response) => {
       conversation_id,
       sender_id: userId,
       sender_name: username,
-      content,
+      content:filtered_message,
       content_type: content_type_name || "text",
       created_at: new Date().toISOString(),
     };
