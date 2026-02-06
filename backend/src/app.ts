@@ -2,6 +2,7 @@ import express, { type Application } from "express";
 import cors from "cors";
 import authRoutes from "./routes/auth.routes.js";
 import conversationRoutes from "./routes/conversation.routes.js";
+import userRoutes from "./routes/user.routes.js";
 import { errorLogs } from "./middlewares/errorLogs.middleware.js";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
 import { rateLimiter } from "./middlewares/rateLimiter.middleware.js";
@@ -50,6 +51,7 @@ app.use(express.json());
 // Application routes
 app.use("/api", authRoutes);
 app.use("/api/conversation", conversationRoutes);
+app.use("/api/user", userRoutes);
 // Error logging middleware (logs errors)
 app.use(errorLogs);
 
