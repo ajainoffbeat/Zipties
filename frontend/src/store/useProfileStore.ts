@@ -1,15 +1,20 @@
 import { create } from "zustand";
-import { getProfile, updateProfile } from "@/lib/api/auth.api";
+import { getProfile, editProfile } from "@/lib/api/auth.api";
 
 interface Profile {
   id: string;
-  name: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
   username: string;
   email: string;
-  website: string;
-  location: string;
-  bio: string;
-  joined_date: string;
+  website?: string;
+  location?: string;
+  bio?: string;
+  joined_date?: string;
+  profileImageUrl?: string;
+  interests?: string;
+  tags?: string;
 }
 
 interface ProfileState {
@@ -25,30 +30,31 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
 
   fetchProfile: async (userId) => {
     set({ loading: true });
-
-    const res = await getProfile(userId)
-
-    set({
-      profile: res.data.data,
-      loading: false,
-    });
+    try {
+      const res = await getProfile(userId);
+      set({
+        profile: res.data.data,
+        loading: false,
+      });
+    } catch (error) {
+      set({ loading: false });
+      console.error("Fetch profile failed", error);
+    }
   },
 
   updateProfile: async (data) => {
     set({ loading: true });
-    const currentProfile = get().profile;
-    
-    if (!currentProfile) {
-      set({ loading: false });
-      return;
-    }
-
     try {
-      const res = await updateProfile(currentProfile.id, data);
-      set({
-        profile: { ...currentProfile, ...data },
-        loading: false,
-      });
+      await editProfile(data);
+      const currentProfile = get().profile;
+      if (currentProfile) {
+        set({
+          profile: { ...currentProfile, ...data },
+          loading: false,
+        });
+      } else {
+        set({ loading: false });
+      }
     } catch (error) {
       set({ loading: false });
       throw error;

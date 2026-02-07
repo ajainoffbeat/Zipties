@@ -17,6 +17,7 @@ interface MessageState {
   addMessage: (msg: Message) => void;
   prependMessages: (msgs: Message[]) => void;
   updateMessageStatus: (id: string, status: Message["status"]) => void;
+  updateMessageId: (oldId: string, newId: string) => void;
   resetMessages: () => void;
 }
 
@@ -41,6 +42,13 @@ export const useMessageStore = create<MessageState>()(
       set((state) => ({
         messages: state.messages.map((m) =>
           m.id === id ? { ...m, status } : m
+        ),
+      })),
+
+    updateMessageId: (oldId, newId) =>
+      set((state) => ({
+        messages: state.messages.map((m) =>
+          m.id === oldId ? { ...m, id: newId } : m
         ),
       })),
 

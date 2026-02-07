@@ -3,7 +3,7 @@ import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 
 type JwtPayload = {
-  sub: string; // userId
+  userId: string;
   email?: string;
 };
 
@@ -30,7 +30,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     set({
       token,
-      userId: decoded.sub,
+      userId: decoded.userId,
       isInitialized: true,
     });
   },

@@ -37,7 +37,7 @@ export function UserDropdownMenuTrigger({
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-30">
+      <DropdownMenuContent align="end" className="w-25">
         {actions.map((action, index) => (
           <DropdownMenuItem
             key={index}
