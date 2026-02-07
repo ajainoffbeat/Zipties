@@ -1,7 +1,7 @@
 import type { Response, Request, NextFunction } from "express";
 import { comparePassword, hashPassword } from "../utils/hashPassword.js";
-import { decodeToken, generateToken } from "../utils/jwt.util.js";
-import { createUser, getUserByEmail, logUserLogin, logUserLogout, resetUserPasswordByToken, updateUserPasswordResetToken, userProfile, verifyPasswordResetToken } from "../services/auth.service.js";
+import { decodeToken, generateToken, extractBearerToken } from "../utils/jwt.util.js";
+import { createUser, getUserByEmail, logUserLogin, logUserLogout, resetUserPasswordByToken, updateUserPasswordResetToken, verifyPasswordResetToken } from "../services/auth.service.js";
 import { AppError } from "../utils/response/appError.js";   
 import { sendSuccess } from "../utils/response/appSuccess.js";
 import { RESPONSE_CODES } from "../constants/responseCode.constant.js";
@@ -284,62 +284,3 @@ export const resetPassword = async (
   }
 };
 
-
-export const getProfile = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { userId }:any = req.params;
-    console.log("userId", userId);
-
-    const rows = await userProfile(userId);
-    console.log("rows", rows);
-    if (!rows) {
-      return res.status(404).json({ message: "Profile not found" });
-    }
-
-    res.json({
-      success: true,
-      data: rows,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-
-// export const logout = async (
-
-//   req: Request,
-//   res: Response,
-//   next: NextFunction
-// ): Promise<void> => {
-//   try {
-//     const userId = req.user?.id; // assuming auth middleware sets req.user
-
-//     if (!userId) {
-//       res.status(401).json({ message: "Unauthorized" });
-//       return;
-//     }
-
-//     await pool.query(
-//       "SELECT sp_log_user_logout($1)",
-//       [userId]
-//     );
-
-//     res.clearCookie("token", {
-//       path: "/",
-//       httpOnly: true,
-//       sameSite: "lax",
-//     });
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Logged out successfully",
-//     });
-//   } catch (error) {
-//     next(error);
-//   }
-// };

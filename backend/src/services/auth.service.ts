@@ -75,14 +75,3 @@ export const resetUserPasswordByToken = async (
   return result.rows[0]?.success === true;
 };
 
-export const userProfile = async (
-  userId: string
-) : Promise<any> =>{
-  console.log("userId", userId);
-  const result =  await pool.query(
-      `SELECT * FROM get_user_profile($1)`,
-      [userId]
-    );
-    console.log("result", result);
-    return result.rows[0]
-}
