@@ -42,10 +42,14 @@ export const editProfile = async (
     
     const profileData = req.body;
 
+    const nameParts = profileData.fullName.trim().split(" ");
+    const firstName = nameParts[0];
+    const lastName = nameParts.slice(1).join(" ") || "";
+
     console.log("userId", userId);
     console.log("profileData", profileData);
 
-    const isUpdated = await updateUserProfile(userId, profileData);
+    const isUpdated = await updateUserProfile(userId, firstName, lastName, profileData);
 
     if (!isUpdated) {
       throw new AppError(400, "Failed to update profile", {

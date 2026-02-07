@@ -16,20 +16,19 @@ export const userProfile = async (
 
 export const updateUserProfile = async (
   userId: string,
+  firstName: string,
+  lastName: string,
   profileData: any
 ): Promise<boolean> => {
   try {
-    console.log("userId", userId);
-    console.log("profileData", profileData);
-
     const result = await pool.query(
       `SELECT update_user(
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
       ) AS success`,
       [
         userId,
-        profileData.firstName || null,
-        profileData.lastName || null,
+        firstName || null,
+        lastName || null,
         profileData.username || null,
         profileData.bio || null,
         profileData.profileImageUrl || null,
