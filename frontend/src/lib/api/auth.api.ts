@@ -19,7 +19,7 @@ export const resetPassword = (data: { token: string; password: string }) =>
   api.post("/reset-password", data);
 
 export const getProfile = (userId: string) =>
-  api.get(`/profile/${userId}`);
+  api.get(`/user/profile/${userId}`);
 
-export const updateProfile = (userId: string, data: any) =>
-  api.put(`/profile/${userId}`, data);
+export const editProfile = (data: any) =>
+  api.post("/user/editprofile", data);

@@ -29,7 +29,6 @@ export const useInboxStore = create<InboxState>()(
     setConversations: (data) =>
       set({
         conversations: data,
-        selectedConvo: data[0] ?? null,
       }),
 
     setSelectedConvo: (convo) =>

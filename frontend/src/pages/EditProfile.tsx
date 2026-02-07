@@ -5,43 +5,53 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  ArrowLeft, 
-  Save, 
-  User, 
-  MapPin, 
+import {
+  ArrowLeft,
+  Save,
+  User,
+  MapPin,
   Link as LinkIcon,
   Calendar,
   Upload
 } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
+import { useAuthStore } from "@/store/authStore";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function EditProfile() {
   const { profile, fetchProfile, updateProfile } = useProfileStore();
+  const userId = useAuthStore(s => s.userId);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    name: "",
+    firstName: "",
+    lastName: "",
     username: "",
     bio: "",
     location: "",
     website: "",
+    profileImageUrl: "",
+    interests: "",
+    tags: "",
   });
 
   useEffect(() => {
-    fetchProfile("140f1214-de5d-4f8f-8b7f-9bba725efe8e");
-  }, []);
+    if (userId) fetchProfile(userId);
+  }, [userId]);
 
   useEffect(() => {
     if (profile) {
       setFormData({
-        name: profile.name || "",
+        firstName: profile.firstName || profile.name?.split(" ")[0] || "",
+        lastName: profile.lastName || profile.name?.split(" ").slice(1).join(" ") || "",
         username: profile.username || "",
         bio: profile.bio || "",
         location: profile.location || "",
         website: profile.website || "",
+        profileImageUrl: profile.profileImageUrl || "",
+        interests: profile.interests || "",
+        tags: profile.tags || "",
       });
     }
   }, [profile]);
@@ -57,7 +67,7 @@ export default function EditProfile() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
+
     try {
       await updateProfile(formData);
       navigate("/profile");
@@ -82,18 +92,23 @@ export default function EditProfile() {
               <CardContent className="pt-6">
                 <div className="flex items-center gap-4">
                   <Avatar className="w-20 h-20 border-2 border-border">
-                    <AvatarFallback className="bg-primary/10 text-primary text-3xl font-bold">
-                      {profile?.name?.split(" ").map(n => n[0]).join("").toUpperCase() || "U"}
-                    </AvatarFallback>
+                    {formData.profileImageUrl ? (
+                      <img src={formData.profileImageUrl} alt="Profile" className="object-cover" />
+                    ) : (
+                      <AvatarFallback className="bg-primary/10 text-primary text-3xl font-bold">
+                        {formData.firstName?.[0] || formData.username?.[0] || "U"}
+                      </AvatarFallback>
+                    )}
                   </Avatar>
-                  <div>
-                    <Button type="button" variant="outline" size="sm" className="gap-2">
-                      <Upload className="w-4 h-4" />
-                      Change Photo
-                    </Button>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      JPG, PNG or GIF. Max 2MB.
-                    </p>
+                  <div className="flex-1 space-y-2">
+                    <Label htmlFor="profileImageUrl">Profile Image URL</Label>
+                    <Input
+                      id="profileImageUrl"
+                      name="profileImageUrl"
+                      value={formData.profileImageUrl}
+                      onChange={handleInputChange}
+                      placeholder="https://example.com/avatar.jpg"
+                    />
                   </div>
                 </div>
               </CardContent>
@@ -110,16 +125,30 @@ export default function EditProfile() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="name">Name</Label>
+                    <Label htmlFor="firstName">First Name</Label>
                     <Input
-                      id="name"
-                      name="name"
-                      value={formData.name}
+                      id="firstName"
+                      name="firstName"
+                      value={formData.firstName}
                       onChange={handleInputChange}
-                      placeholder="Your full name"
+                      placeholder="John"
                       className="mt-1"
                     />
                   </div>
+                  <div>
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      name="lastName"
+                      value={formData.lastName}
+                      onChange={handleInputChange}
+                      placeholder="Doe"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="username">Username</Label>
                     <Input
@@ -131,23 +160,17 @@ export default function EditProfile() {
                       className="mt-1"
                     />
                   </div>
-                </div>
-                
-                <div>
-                  <Label htmlFor="bio">Bio</Label>
-                  <Textarea
-                    id="bio"
-                    name="bio"
-                    value={formData.bio}
-                    onChange={handleInputChange}
-                    placeholder="Tell us about yourself"
-                    className="mt-1 resize-none"
-                    rows={3}
-                    maxLength={160}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {formData.bio.length}/160 characters
-                  </p>
+                  <div>
+                    <Label htmlFor="bio">Bio</Label>
+                    <Input
+                      id="bio"
+                      name="bio"
+                      value={formData.bio}
+                      onChange={handleInputChange}
+                      placeholder="Software developer"
+                      className="mt-1"
+                    />
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -161,28 +184,54 @@ export default function EditProfile() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="location">Location</Label>
-                  <Input
-                    id="location"
-                    name="location"
-                    value={formData.location}
-                    onChange={handleInputChange}
-                    placeholder="City, Country"
-                    className="mt-1"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="interests">Interests</Label>
+                    <Input
+                      id="interests"
+                      name="interests"
+                      value={formData.interests}
+                      onChange={handleInputChange}
+                      placeholder="coding, music, travel"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="tags">Tags</Label>
+                    <Input
+                      id="tags"
+                      name="tags"
+                      value={formData.tags}
+                      onChange={handleInputChange}
+                      placeholder="developer, 150"
+                      className="mt-1"
+                    />
+                  </div>
                 </div>
-                
-                <div>
-                  <Label htmlFor="website">Website</Label>
-                  <Input
-                    id="website"
-                    name="website"
-                    value={formData.website}
-                    onChange={handleInputChange}
-                    placeholder="https://yourwebsite.com"
-                    className="mt-1"
-                  />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="location">Location</Label>
+                    <Input
+                      id="location"
+                      name="location"
+                      value={formData.location}
+                      onChange={handleInputChange}
+                      placeholder="City, Country"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="website">Website</Label>
+                    <Input
+                      id="website"
+                      name="website"
+                      value={formData.website}
+                      onChange={handleInputChange}
+                      placeholder="https://yourwebsite.com"
+                      className="mt-1"
+                    />
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -207,7 +256,7 @@ export default function EditProfile() {
                     Contact support to change your email
                   </p>
                 </div>
-                
+
                 <div>
                   <Label>Member Since</Label>
                   <Input
