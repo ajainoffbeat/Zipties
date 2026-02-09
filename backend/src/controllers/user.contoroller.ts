@@ -39,18 +39,17 @@ export const editProfile = async (
     const token = extractBearerToken(req.headers.authorization);
     const decoded = decodeToken(token);
     const userId = decoded.userId;
-    
     const profileData = req.body;
-
-    const nameParts = profileData.fullName.trim().split(" ");
-    const firstName = nameParts[0];
-    const lastName = nameParts.slice(1).join(" ") || "";
-
-    console.log("userId", userId);
-    console.log("profileData", profileData);
-
-    const isUpdated = await updateUserProfile(userId, firstName, lastName, profileData);
-
+    const nameParts = profileData.name?.trim().split(" ");
+    const firstName = nameParts?.[0] || null;
+    const lastName = nameParts?.slice(1).join(" ") || null;
+    const isUpdated = await updateUserProfile(
+      userId,
+      firstName,
+      lastName,
+      profileData
+    );
+    console.log("isUpdated", isUpdated);
     if (!isUpdated) {
       throw new AppError(400, "Failed to update profile", {
         code: RESPONSE_CODES.BAD_REQUEST,

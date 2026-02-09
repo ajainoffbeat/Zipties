@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION update_user(
+CREATE OR REPLACE FUNCTION fn_update_user(
     p_user_id UUID,
     p_firstname VARCHAR(50) DEFAULT NULL,
     p_lastname VARCHAR(50) DEFAULT NULL,

@@ -247,7 +247,7 @@ export default function Messages() {
     } catch (err: any) {
       const isBlocked = err.response?.data?.message?.includes("blocked") || err.message?.includes("blocked");
       if (isBlocked) {
-        toast.error("Cannot send message: You or the other user has blocked the other.");
+        toast.error("Cannot send message: You are blocked by the user.");
       }
       updateMessageStatus(tempId, "error" as any);
     }
