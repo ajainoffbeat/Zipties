@@ -6,7 +6,7 @@ export const userProfile = async (
 ) : Promise<any> =>{
   console.log("userId", userId);
   const result =  await pool.query(
-      `SELECT * FROM get_user_profile($1)`,
+      `SELECT * FROM fn_get_user_profile($1)`,
       [userId]
     );
     console.log("result", result);

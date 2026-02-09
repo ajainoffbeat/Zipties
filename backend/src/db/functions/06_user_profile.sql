@@ -28,6 +28,38 @@ BEGIN
         tags = COALESCE(p_tags, tags)
     WHERE id = p_user_id;
     
-    RETURN FOUND;
-END;
-$$;
+    AS $BODY$
+
+    BEGIN
+
+    RETURN QUERY
+
+    SELECT
+
+        u.id,
+
+        CONCAT_WS(' ', u.firstname, u.lastname)::text AS name,
+
+        u.username::text,
+
+        u.email::text,
+
+        u.created_at
+
+    FROM "user" u
+
+    WHERE u.id = p_user_id
+
+        AND u.is_blocked = false
+
+        AND u.is_active = true;
+
+    END;
+
+    $BODY$;
+    
+    ALTER FUNCTION public.get_user_profile(uuid)
+
+        OWNER TO postgres;
+
+    
