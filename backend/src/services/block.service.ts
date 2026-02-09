@@ -34,18 +34,19 @@ export const blockUser = async (
   }
 
   try {
+    console.log("isBlocking", isBlocking);
     // Choose the appropriate stored procedure based on isBlocking parameter
     if (isBlocking) {
-      // Block operation: sp_block_user(p_user_id, p_blocked_user_id, p_comment)
+      // Block operation: fn_block_user(p_user_id, p_blocked_user_id, p_comment)
       const result = await pool.query(
-        'SELECT * FROM sp_block_user($1, $2, $3)',
+        'SELECT * FROM fn_block_user($1, $2, $3)',
         [userBlocking, userBlocked, comment || null]
       );
 
       // Check if the operation was successful
       if (!result.rows[0]?.success) {
         const message = result.rows[0]?.message || 'Block operation failed';
-        
+
         // Handle specific error cases
         if (message.includes('already blocked')) {
           throw new AppError(409, message, {
@@ -53,14 +54,14 @@ export const blockUser = async (
             success: false,
           });
         }
-        
+
         if (message.includes('do not exist') || message.includes('required')) {
           throw new AppError(400, message, {
             code: RESPONSE_CODES.BAD_REQUEST,
             success: false,
           });
         }
-        
+
         // General operation failure
         throw new AppError(400, message, {
           code: RESPONSE_CODES.BAD_REQUEST,
@@ -74,16 +75,16 @@ export const blockUser = async (
         blocked_at: result.rows[0]?.blocked_at || new Date().toISOString(),
       };
     } else {
-      // Unblock operation: sp_unblock_user(p_user_id, p_blocked_user_id)
+      // Unblock operation: fn_unblock_user(p_user_id, p_blocked_user_id)
       const result = await pool.query(
-        'SELECT * FROM sp_unblock_user($1, $2)',
+        'SELECT * FROM fn_unblock_user($1, $2)',
         [userBlocking, userBlocked]
       );
 
       // Check if the operation was successful
       if (!result.rows[0]?.success) {
         const message = result.rows[0]?.message || 'Unblock operation failed';
-        
+
         // Handle specific error cases
         if (message.includes('not found')) {
           throw new AppError(404, message, {
@@ -91,14 +92,14 @@ export const blockUser = async (
             success: false,
           });
         }
-        
+
         if (message.includes('required') || message.includes('Invalid operation')) {
           throw new AppError(400, message, {
             code: RESPONSE_CODES.BAD_REQUEST,
             success: false,
           });
         }
-        
+
         // General operation failure
         throw new AppError(400, message, {
           code: RESPONSE_CODES.BAD_REQUEST,
@@ -117,7 +118,7 @@ export const blockUser = async (
     if (error instanceof AppError) {
       throw error;
     }
-    
+
     // Handle database connection errors
     if (error.code === 'ECONNREFUSED' || error.code === '3D000') {
       throw new AppError(503, "Database service unavailable", {
@@ -125,7 +126,7 @@ export const blockUser = async (
         success: false,
       });
     }
-    
+
     // Re-throw the error for the controller to handle
     throw error;
   }

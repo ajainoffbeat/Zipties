@@ -52,6 +52,22 @@ export const sendMessage = async (
   content: string,
   contentTypeName: string = 'text'
 ): Promise<string> => {
+  // 1. Check if any member has blocked the sender or vice-versa
+  const blockCheck = await pool.query(
+    `SELECT 1 
+     FROM conversation_member cm
+     JOIN user_report ur ON 
+       (ur.user_id = $1 AND ur.blocked_user_id = cm.user_id) OR
+       (ur.user_id = cm.user_id AND ur.blocked_user_id = $1)
+     WHERE cm.conversation_id = $2 AND cm.user_id != $1
+     LIMIT 1`,
+    [senderId, conversationId]
+  );
+
+  if (blockCheck.rowCount && blockCheck.rowCount > 0) {
+    throw new Error("Message blocked: One of the users has blocked the other.");
+  }
+
   const result = await pool.query(
     "SELECT fn_send_message($1, $2, $3, $4) as id",
     [conversationId, senderId, content, contentTypeName]

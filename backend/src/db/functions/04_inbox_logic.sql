@@ -14,8 +14,8 @@ BEGIN
       AND user_id = p_user_id;
 END;
 $$ LANGUAGE plpgsql;
-
-
+ 
+ 
 -- Function: Get User Inbox (Step 7)
 -- Returns: list of conversations with last message, unread count, etc.
 CREATE OR REPLACE FUNCTION fn_get_user_inbox(
@@ -32,38 +32,40 @@ RETURNS TABLE (
     last_message_sender_name TEXT,
     source_type VARCHAR,
     source_id UUID,
-    is_blocked BOOLEAN
+    is_blocked BOOLEAN,
+    blocked_by UUID
 ) AS $$
 BEGIN
     RETURN QUERY
-    SELECT 
+    SELECT
         c.id AS conversation_id,
         c.title,
         ct.name AS type_name,
         cm.unread_count,
-
+ 
         -- Hide content if conversation is blocked
-        CASE 
-            WHEN blocked.is_blocked THEN NULL
+        CASE
+            WHEN block_info.is_blocked THEN NULL
             ELSE m.content
         END AS last_message_content,
-
+ 
         c.last_message_at,
         m.sender_id AS last_message_sender_id,
         u.username::TEXT AS last_message_sender_name,
         cst.name AS source_type,
         c.source_id,
-
-        blocked.is_blocked
-
+ 
+        COALESCE(block_info.is_blocked, FALSE),
+        block_info.blocked_by
+ 
     FROM conversation_member cm
-    JOIN conversation c 
+    JOIN conversation c
         ON cm.conversation_id = c.id
-    JOIN conversation_type ct 
+    JOIN conversation_type ct
         ON c.conversation_type_id = ct.id
-    LEFT JOIN conversation_source_type cst 
+    LEFT JOIN conversation_source_type cst
         ON c.conversation_source_type_id = cst.id
-
+ 
     -- Latest message per conversation
     LEFT JOIN LATERAL (
         SELECT content, sender_id
@@ -72,24 +74,21 @@ BEGIN
         ORDER BY m2.created_at DESC
         LIMIT 1
     ) m ON true
-
-    LEFT JOIN "user" u 
+ 
+    LEFT JOIN "user" u
         ON m.sender_id = u.id
-
+ 
     -- Check if conversation is blocked (by anyone in the conversation or by user)
-    LEFT JOIN LATERAL (
-        SELECT EXISTS (
-            SELECT 1
-            FROM conversation_member cm2
-            LEFT JOIN user_report ur
-              ON ( (ur.user_id = p_user_id AND ur.blocked_user_id = cm2.user_id)
-                OR (ur.user_id = cm2.user_id AND ur.blocked_user_id = p_user_id)
-              )
-            WHERE cm2.conversation_id = c.id
-              AND ur.id IS NOT NULL
-        ) AS is_blocked
-    ) blocked ON true
-
+LEFT JOIN LATERAL (
+    SELECT TRUE AS is_blocked, ur.user_id AS blocked_by
+    FROM user_report ur
+    WHERE
+        (ur.user_id = p_user_id AND ur.blocked_user_id = cm.user_id)
+        OR
+        (ur.user_id = cm.user_id AND ur.blocked_user_id = p_user_id)
+    LIMIT 1
+) block_info ON true
+ 
     WHERE cm.user_id = p_user_id
     ORDER BY c.last_message_at DESC NULLS LAST;
 END;

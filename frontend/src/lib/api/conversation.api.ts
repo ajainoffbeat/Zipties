@@ -42,3 +42,11 @@ export const getReadMessages = async (conversationId: string, messageId: string)
   });
   return res.data.data;
 };
+
+export const blockUserApi = async (payload: {
+  user_blocked: string;
+  is_blocking: boolean;
+}) => {
+  const res = await api.post("/block/user", payload);
+  return res.data;
+};

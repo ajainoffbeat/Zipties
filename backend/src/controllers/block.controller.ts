@@ -44,14 +44,14 @@ export const blockUser = async (
 
     // Call the service to block or unblock the user
     const blockResult = await blockService.blockUser(
-      user_blocked, 
-      user_blocking, 
+      user_blocked,
+      user_blocking,
       is_blocking !== false, // Default to true if not provided
       comment
     );
 
     const action = is_blocking === false ? "unblocked" : "blocked";
-    
+
     sendSuccess(res, {
       status: RESPONSE_CODES.SUCCESS,
       message: `User ${action} successfully`,

@@ -22,12 +22,13 @@ import {
 import { cn } from "@/lib/utils";
 import { UserDropdownMenuTrigger } from "@/components/common/UserDropdown";
 import { useInboxStore } from "@/store/useInboxStore";
-import { getConversationMessages, getInbox, getReadMessages } from "@/lib/api/conversation.api";
+import { getConversationMessages, getInbox, getReadMessages, blockUserApi } from "@/lib/api/conversation.api";
 import { Message, useMessageStore } from "@/store/useMessageStore";
 import { sendMessageApi } from "@/lib/api/conversation.api";
 import { socket } from "@/lib/socket";
 import { useAuthStore } from "@/store/authStore";
 import { useProfileStore } from "@/store/useProfileStore";
+import { toast } from "sonner";
 
 export default function Messages() {
 
@@ -36,6 +37,7 @@ export default function Messages() {
     selectedConvo,
     setConversations,
     setSelectedConvo,
+    updateConversation,
   } = useInboxStore();
 
   const { messages, addMessage, updateMessageStatus, updateMessageId, setMessages, prependMessages } = useMessageStore();
@@ -141,7 +143,10 @@ export default function Messages() {
         minute: "2-digit",
       }),
       unread: item.unread_count ?? 0,
-      online: false, // will be updated via socket
+      online: false,
+      otherUserId: item.other_user_id,
+      isBlocked: item.is_blocked ?? false,
+      blockedBy: item.blocked_by,
     }));
   };
 
@@ -239,12 +244,47 @@ export default function Messages() {
         message_id: res.message_id,
       });
 
-    } catch (err) {
-      console.error("Send message failed", err);
-      updateMessageStatus(tempId, "sending"); // Should probably add an "error" status
+    } catch (err: any) {
+      const isBlocked = err.response?.data?.message?.includes("blocked") || err.message?.includes("blocked");
+      if (isBlocked) {
+        toast.error("Cannot send message: You or the other user has blocked the other.");
+      }
+      updateMessageStatus(tempId, "error" as any);
     }
   };
 
+  const handleBlock = async (convo: any, isBlocking: boolean) => {
+    const targetUserId = convo.otherUserId;
+    try {
+      if (!targetUserId) {
+        console.error("Cannot block: otherUserId is missing");
+        return;
+      }
+      const res = await blockUserApi({
+        user_blocked: targetUserId,
+        is_blocking: isBlocking
+      });
+
+      if (res.status === 0 || res.message?.includes("successfully")) {
+        const updatePayload = {
+          isBlocked: isBlocking,
+          blockedBy: isBlocking ? userId : null
+        };
+
+        updateConversation(convo.id, updatePayload);
+
+        if (selectedConvo?.id === convo.id) {
+          setSelectedConvo({
+            ...selectedConvo,
+            ...updatePayload
+          });
+        }
+      }
+    } catch (error: any) {
+      console.error("Failed to block/unblock user", error);
+      alert(error.response?.data?.message || "Failed to update block status");
+    }
+  };
   return (
     <AppLayout>
       <div className="container mx-auto px-0 md:px-4 py-0 md:py-4">
@@ -270,7 +310,6 @@ export default function Messages() {
 
               <div className="flex-1 overflow-y-auto">
                 {conversations?.map((convo) => (
-                  console.log("convo", convo),
                   <button
                     key={convo.id}
                     onClick={async () => {
@@ -365,10 +404,10 @@ export default function Messages() {
                           userId={""}
                           actions={[
                             {
-                              label: "Block user",
+                              label: (selectedConvo.isBlocked && selectedConvo.blockedBy === userId) ? "Unblock user" : "Block user",
                               icon: <UserX className="h-4 w-4" />,
-                              destructive: true,
-                              onClick: () => console.log("Block user"),
+                              destructive: !(selectedConvo.isBlocked && selectedConvo.blockedBy === userId),
+                              onClick: () => handleBlock(selectedConvo, !(selectedConvo.isBlocked && selectedConvo.blockedBy === userId)),
                             }
                           ]}
                         />
@@ -434,18 +473,42 @@ export default function Messages() {
 
                   {/* Input Area */}
                   <div className="p-4 border-t border-border bg-card">
-                    <div className="flex items-center gap-2 md:gap-3">
-                      <Input
-                        placeholder="Type a message..."
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                        className="flex-1"
-                      />
-                      <Button variant="hero" size="icon" onClick={handleSend} className="shrink-0">
-                        <Send className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    {selectedConvo.isBlocked ? (
+                      selectedConvo.blockedBy === userId ? (
+                        <div className="flex items-center justify-between p-2 bg-secondary/50 rounded-lg">
+                          <p className="text-sm text-muted-foreground font-medium">
+                            You have blocked this user.
+                          </p>
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="text-primary h-auto p-0"
+                            onClick={() => handleBlock(selectedConvo, false)}
+                          >
+                            Unblock
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center p-2 bg-secondary/50 rounded-lg">
+                          <p className="text-sm text-muted-foreground font-medium">
+                            You are blocked and cannot send messages.
+                          </p>
+                        </div>
+                      )
+                    ) : (
+                      <div className="flex items-center gap-2 md:gap-3">
+                        <Input
+                          placeholder="Type a message..."
+                          value={newMessage}
+                          onChange={(e) => setNewMessage(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                          className="flex-1"
+                        />
+                        <Button variant="hero" size="icon" onClick={handleSend} className="shrink-0">
+                          <Send className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </>
               )}

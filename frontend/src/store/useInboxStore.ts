@@ -11,6 +11,9 @@ interface Conversation {
   time: string;
   unread: number;
   online: boolean;
+  otherUserId: string;
+  isBlocked: boolean;
+  blockedBy: string | null;
 }
 
 interface InboxState {

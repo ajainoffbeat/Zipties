@@ -56,6 +56,22 @@ BEGIN
         RAISE EXCEPTION 'Invalid content type: %', p_content_type_name;
     END IF;
 
+    -- Block Check: Ensure no block exists between sender and any other member in the conversation
+    IF EXISTS (
+        SELECT 1
+        FROM conversation_member cm
+        WHERE cm.conversation_id = p_conversation_id
+          AND cm.user_id != p_sender_id
+          AND EXISTS (
+              SELECT 1
+              FROM user_report ur
+              WHERE (ur.user_id = p_sender_id AND ur.blocked_user_id = cm.user_id)
+                 OR (ur.user_id = cm.user_id AND ur.blocked_user_id = p_sender_id)
+          )
+    ) THEN
+        RAISE EXCEPTION 'Message blocked: One of the users has blocked the other.';
+    END IF;
+
     -- Insert Message
     INSERT INTO message (
         conversation_id,
