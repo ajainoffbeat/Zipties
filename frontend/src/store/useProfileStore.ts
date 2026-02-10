@@ -4,17 +4,19 @@ import { getProfile, editProfile } from "@/lib/api/auth.api";
 interface Profile {
   id: string;
   name?: string;
-  firstName?: string;
-  lastName?: string;
+  first_name?: string;
+  last_name?: string;
   username: string;
   email: string;
-  website?: string;
+  // website?: string;
   location?: string;
   bio?: string;
   joined_date?: string;
   profileImageUrl?: string;
   interests?: string;
   tags?: string;
+  city_id?: number | string;
+  city_name?: string;
 }
 
 interface ProfileState {

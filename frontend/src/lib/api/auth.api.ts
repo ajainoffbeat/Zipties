@@ -23,3 +23,6 @@ export const getProfile = (userId: string) =>
 
 export const editProfile = (data: any) =>
   api.post("/user/editprofile", data);
+
+export const getCitiesList = (search?: string) =>
+  api.get(`/user/cities${search ?`?q=${search}` : ""}`);

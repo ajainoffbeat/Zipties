@@ -3,21 +3,18 @@ import { pool } from "../config/db.js";
 
 export const userProfile = async (
   userId: string
-) : Promise<any> =>{
-  console.log("userId", userId);
-  const result =  await pool.query(
-      `SELECT * FROM get_user_profile($1)`,
-      [userId]
-    );
-    console.log("result", result);
-    return result.rows[0]
+): Promise<any> => {
+  const result = await pool.query(
+    `SELECT * FROM get_user_profile($1)`,
+    [userId]
+  );
+  console.log("result", result);
+  return result.rows[0]
 }
 
 
 export const updateUserProfile = async (
   userId: string,
-  firstName: string,
-  lastName: string,
   profileData: any
 ): Promise<boolean> => {
   try {
@@ -27,8 +24,8 @@ export const updateUserProfile = async (
       ) AS success`,
       [
         userId,
-        firstName || null,
-        lastName || null,
+        profileData.firstName || null,
+        profileData.lastName || null,
         profileData.username || null,
         profileData.bio || null,
         profileData.profileImageUrl || null,
@@ -44,3 +41,30 @@ export const updateUserProfile = async (
     return false;
   }
 };
+
+export const getUsCities = async (
+  countryCode: string,
+  search?: string,
+  state?: string,
+  limit = 50,
+  offset = 0
+): Promise<any[]> => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM fn_get_cities($1, $2, $3, $4, $5)`,
+      [
+        countryCode,
+        state || null,
+        search || null,
+        limit,
+        offset
+      ]
+    );
+
+    return result.rows;
+  } catch (err) {
+    console.error("Error fetching cities:", err);
+    throw err;
+  }
+};
+

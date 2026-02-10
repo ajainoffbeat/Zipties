@@ -348,7 +348,6 @@ export default function Messages() {
                       <p className="text-sm text-muted-foreground truncate">{convo.lastMessage}</p>
                     </div>
                     {convo.unread > 0 && (
-                      console.log("unread", convo.unread),
                       <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">
                         {convo.unread}
                       </span>

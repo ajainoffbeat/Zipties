@@ -3,11 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Settings, 
-  Edit2, 
-  MapPin, 
-  Calendar, 
+import {
+  Settings,
+  Edit2,
+  MapPin,
+  Calendar,
   Link as LinkIcon,
   Users,
   FileText,
@@ -72,90 +72,101 @@ export default function Profile() {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           {/* Profile Header */}
-          <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-sm mb-6">
-            {/* Cover */}
-            <div className="h-32 md:h-48 bg-gradient-hero" />
+          <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-sm mb-6 p-6 md:p-8">
+            <div className="flex flex-col md:flex-row gap-6 md:items-start">
+              {/* Avatar section */}
+              <Avatar className="w-24 h-24 md:w-32 md:h-32 border-4 border-background shadow-md shrink-0">
+                <AvatarFallback className="bg-primary/10 text-primary text-2xl md:text-3xl font-bold">
+                  {profile?.first_name?.charAt(0)}{profile?.last_name?.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
 
-            {/* Profile Info */}
-            <div className="px-6 pb-6">
-              <div className="flex flex-col md:flex-row md:items-end md:justify-between -mt-12 md:-mt-16 mb-4">
-                <div className="flex items-end gap-4">
-                  <Avatar className="w-24 h-24 md:w-32 md:h-32 border-4 border-card shadow-lg">
-                    <AvatarFallback className="bg-primary/10 text-primary text-2xl md:text-3xl font-bold">
-                      {mockUser.initials}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="hidden md:block mb-2">
-                    <h1 className="text-2xl font-bold text-foreground">{profile?.name}</h1>
+              {/* Info section */}
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                  <div>
+                    <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+                      {profile?.first_name} {profile?.last_name}
+                    </h1>
                     <p className="text-muted-foreground">{profile?.username}</p>
                   </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="gap-1 px-4" onClick={handleEditProfile}>
+                      <Edit2 className="w-4 h-4" />
+                      Edit Profile
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-2 mt-4 md:mt-0">
-                  <Button variant="outline" size="sm" className="gap-1" onClick={handleEditProfile}>
-                    <Edit2 className="w-4 h-4" />
-                    Edit Profile
-                  </Button>
-                  <Button variant="ghost" size="icon">
-                    <Settings className="w-5 h-5" />
-                  </Button>
+
+                <p className="text-foreground text-sm md:text-base leading-relaxed mb-4 max-w-2xl">
+                  {profile?.bio}
+                </p>
+
+                <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground mb-6">
+                  {profile?.city_name && (
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <MapPin className="w-4 h-4 text-primary" />
+                      {profile.city_name}
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <Calendar className="w-4 h-4 text-primary" />
+                    Joined{" "}
+                    {profile?.joined_date
+                      ? new Date(profile.joined_date).toLocaleDateString("en-IN", {
+                        year: "numeric",
+                        month: "long",
+                      })
+                      : ""}
+                  </span>
                 </div>
-              </div>
 
-              <div className="md:hidden mb-4">
-                <h1 className="text-xl font-bold text-foreground">{profile?.name}</h1>
-                <p className="text-muted-foreground text-sm">{profile?.username}</p>
-              </div>
-
-              <p className="text-foreground mb-4">{profile?.bio}</p>
-
-              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-4">
-                <span className="flex items-center gap-1">
-                  <MapPin className="w-4 h-4" />
-                  {profile?.location}
-                </span>
-                <span className="flex items-center gap-1">
-                  <LinkIcon className="w-4 h-4" />
-                  <a href="#" className="text-primary hover:underline">{profile?.website}</a>
-                </span>
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-4 h-4" />
-                  Joined {profile?.joined_date}
-                </span>
-              </div>
-
-              <div className="flex gap-6">
-                <button className="hover:underline">
-                  <span className="font-bold text-foreground">{mockUser.followers.toLocaleString()}</span>{" "}
-                  <span className="text-muted-foreground">Followers</span>
-                </button>
-                <button className="hover:underline">
-                  <span className="font-bold text-foreground">{mockUser.following.toLocaleString()}</span>{" "}
-                  <span className="text-muted-foreground">Following</span>
-                </button>
+                {/* <div className="flex gap-8 border-t border-border pt-6">
+                  <div className="flex flex-col">
+                    <span className="text-xl font-bold text-foreground">{mockUser.followers.toLocaleString()}</span>
+                    <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Followers</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xl font-bold text-foreground">{mockUser.following.toLocaleString()}</span>
+                    <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Following</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xl font-bold text-foreground">{mockUser.posts}</span>
+                    <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Posts</span>
+                  </div>
+                </div> */}
               </div>
             </div>
-          </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            {[
-              { icon: FileText, label: "Posts", value: mockUser.posts },
-              { icon: Users, label: "Proposals", value: mockUser.proposals },
-              { icon: ShoppingBag, label: "Listings", value: mockUser.listings },
-            ].map((stat, index) => (
-              <div
-                key={index}
-                className="bg-card rounded-xl border border-border p-4 text-center shadow-sm"
-              >
-                <stat.icon className="w-5 h-5 text-primary mx-auto mb-2" />
-                <p className="text-2xl font-bold text-foreground">{stat.value}</p>
-                <p className="text-sm text-muted-foreground">{stat.label}</p>
+            {/* Tags/Interests Section */}
+            {(profile?.interests || profile?.tags) && (
+              <div className="mt-8 pt-6 border-t border-border space-y-4">
+                {profile?.interests && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider mr-2">Interests:</span>
+                    {profile.interests.split(',').map((interest, i) => (
+                      <Badge key={i} variant="secondary" className="font-medium cursor-pointer hover:bg-secondary/80">
+                        {interest.trim()}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                {profile?.tags && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider mr-2">Skills:</span>
+                    {profile.tags.split(',').map((tag, i) => (
+                      <Badge key={i} variant="outline" className="font-medium cursor-pointer hover:border-primary">
+                        {tag.trim()}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
-            ))}
+            )}
           </div>
 
           {/* Tabs */}
-          <Tabs defaultValue="posts">
+          {/* <Tabs defaultValue="posts">
             <TabsList className="w-full justify-start mb-6">
               <TabsTrigger value="posts" className="gap-1">
                 <FileText className="w-4 h-4" />
@@ -232,7 +243,7 @@ export default function Profile() {
                 <p>No liked posts yet</p>
               </div>
             </TabsContent>
-          </Tabs>
+          </Tabs> */}
         </div>
       </div>
     </AppLayout>

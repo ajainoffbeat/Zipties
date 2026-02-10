@@ -2,38 +2,66 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  ArrowLeft,
-  Save,
-  User,
-  MapPin,
-  Link as LinkIcon,
-  Calendar,
-  Upload
-} from "lucide-react";
+import { Save, User, MapPin, Calendar, Check, ChevronsUpDown } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
 import { useAuthStore } from "@/store/authStore";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  profileSchema,
+  ProfileFormValues,
+} from "@/lib/validators/profile.schema";
+import { getCitiesList } from "@/lib/api/auth.api";
+import { cn } from "@/lib/utils";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { debounce } from "lodash";
 
 export default function EditProfile() {
   const { profile, fetchProfile, updateProfile } = useProfileStore();
   const userId = useAuthStore(s => s.userId);
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    username: "",
-    bio: "",
-    location: "",
-    website: "",
-    profileImageUrl: "",
-    interests: "",
-    tags: "",
+
+  const [open, setOpen] = useState(false);
+  const [cities, setCities] = useState<any[]>([]);
+  const [citySearch, setCitySearch] = useState("");
+  const [loadingCities, setLoadingCities] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      username: "",
+      bio: "",
+      location: "",
+      profileImageUrl: "",
+      interests: "",
+      tags: "",
+      cityId: "",
+    },
   });
 
   useEffect(() => {
@@ -42,254 +70,246 @@ export default function EditProfile() {
 
   useEffect(() => {
     if (profile) {
-      setFormData({
-        firstName: profile.firstName || profile.name?.split(" ")[0] || "",
-        lastName: profile.lastName || profile.name?.split(" ").slice(1).join(" ") || "",
+      reset({
+        firstName: profile.first_name || "",
+        lastName: profile.last_name || "",
         username: profile.username || "",
         bio: profile.bio || "",
         location: profile.location || "",
-        website: profile.website || "",
         profileImageUrl: profile.profileImageUrl || "",
         interests: profile.interests || "",
         tags: profile.tags || "",
+        cityId: profile.city_id || "",
       });
+      if (profile.city_name) {
+        setCitySearch(profile.city_name);
+      }
     }
-  }, [profile]);
+  }, [profile, reset]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
+  const fetchCities = useCallback(
+    debounce(async (search: string) => {
+      // Fetch even if search is empty to show initial list
+      setLoadingCities(true);
+      try {
+        const res = await getCitiesList(search);
+        setCities(res.data.data || []);
+      } catch (err) {
+        console.error("Failed to fetch cities", err);
+      } finally {
+        setLoadingCities(false);
+      }
+    }, 500),
+    []
+  );
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  useEffect(() => {
+    fetchCities(citySearch);
+  }, [citySearch, fetchCities]);
 
-    try {
-      await updateProfile(formData);
-      navigate("/profile");
-    } catch (error) {
-      console.error("Failed to update profile:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const profileImageUrl = watch("profileImageUrl");
+  const firstName = watch("firstName");
+  const username = watch("username");
+  const selectedCityId = watch("cityId");
 
-  const handleCancel = () => {
+  const onSubmit = async (data: ProfileFormValues) => {
+    await updateProfile(data);
     navigate("/profile");
   };
 
   return (
     <AppLayout>
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Profile Picture */}
-            <Card className="border border-border shadow-sm">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <Avatar className="w-20 h-20 border-2 border-border">
-                    {formData.profileImageUrl ? (
-                      <img src={formData.profileImageUrl} alt="Profile" className="object-cover" />
-                    ) : (
-                      <AvatarFallback className="bg-primary/10 text-primary text-3xl font-bold">
-                        {formData.firstName?.[0] || formData.username?.[0] || "U"}
-                      </AvatarFallback>
-                    )}
-                  </Avatar>
-                  <div className="flex-1 space-y-2">
-                    <Label htmlFor="profileImageUrl">Profile Image URL</Label>
-                    <Input
-                      id="profileImageUrl"
-                      name="profileImageUrl"
-                      value={formData.profileImageUrl}
-                      onChange={handleInputChange}
-                      placeholder="https://example.com/avatar.jpg"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Profile Image */}
+          <Card>
+            <CardContent className="pt-6 flex gap-4 items-center">
+              <Avatar className="w-20 h-20">
+                {profileImageUrl ? (
+                  <img src={profileImageUrl} />
+                ) : (
+                  <AvatarFallback className="bg-primary/10 text-primary text-xl font-bold">
+                    {firstName?.[0] || username?.[0] || "U"}
+                  </AvatarFallback>
+                )}
+              </Avatar>
 
-            {/* Basic Information */}
-            <Card className="border border-border shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="w-5 h-5" />
-                  Basic Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="firstName">First Name</Label>
-                    <Input
-                      id="firstName"
-                      name="firstName"
-                      value={formData.firstName}
-                      onChange={handleInputChange}
-                      placeholder="John"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input
-                      id="lastName"
-                      name="lastName"
-                      value={formData.lastName}
-                      onChange={handleInputChange}
-                      placeholder="Doe"
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="username">Username</Label>
-                    <Input
-                      id="username"
-                      name="username"
-                      value={formData.username}
-                      onChange={handleInputChange}
-                      placeholder="@username"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="bio">Bio</Label>
-                    <Input
-                      id="bio"
-                      name="bio"
-                      value={formData.bio}
-                      onChange={handleInputChange}
-                      placeholder="Software developer"
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Location & Website */}
-            <Card className="border border-border shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MapPin className="w-5 h-5" />
-                  Location & Links
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="interests">Interests</Label>
-                    <Input
-                      id="interests"
-                      name="interests"
-                      value={formData.interests}
-                      onChange={handleInputChange}
-                      placeholder="coding, music, travel"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="tags">Tags</Label>
-                    <Input
-                      id="tags"
-                      name="tags"
-                      value={formData.tags}
-                      onChange={handleInputChange}
-                      placeholder="developer, 150"
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="location">Location</Label>
-                    <Input
-                      id="location"
-                      name="location"
-                      value={formData.location}
-                      onChange={handleInputChange}
-                      placeholder="City, Country"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="website">Website</Label>
-                    <Input
-                      id="website"
-                      name="website"
-                      value={formData.website}
-                      onChange={handleInputChange}
-                      placeholder="https://yourwebsite.com"
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Account Info (Read-only) */}
-            <Card className="border border-border shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5" />
-                  Account Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label>Email</Label>
-                  <Input
-                    value={profile?.email || ""}
-                    disabled
-                    className="mt-1 bg-muted"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Contact support to change your email
+              <div className="flex-1">
+                <Label>Profile Image URL</Label>
+                <Input {...register("profileImageUrl")} />
+                {errors.profileImageUrl && (
+                  <p className="text-sm text-destructive">
+                    {errors.profileImageUrl.message}
                   </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Basic Info */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex gap-2 items-center">
+                <User className="w-5 h-5" /> Basic Information
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent className="grid md:grid-cols-2 gap-4">
+              <div>
+                <Label>First Name</Label>
+                <Input {...register("firstName")} />
+              </div>
+
+              <div>
+                <Label>Last Name</Label>
+                <Input {...register("lastName")} />
+              </div>
+
+              <div>
+                <Label>Username</Label>
+                <Input {...register("username")} />
+                {errors.username && (
+                  <p className="text-sm text-destructive">
+                    {errors.username.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label>Bio</Label>
+                <Input {...register("bio")} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Location & Links */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex gap-2 items-center">
+                <MapPin className="w-5 h-5" /> Interests & Location
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Interests (comma separated)</Label>
+                  <Input {...register("interests")} placeholder="Coding, Design, Travel" />
                 </div>
 
                 <div>
-                  <Label>Member Since</Label>
-                  <Input
-                    value={profile?.joined_date || ""}
-                    disabled
-                    className="mt-1 bg-muted"
-                  />
+                  <Label>Tags (comma separated)</Label>
+                  <Input {...register("tags")} placeholder="Fullstack, React, UI/UX" />
                 </div>
-              </CardContent>
-            </Card>
+                <div className="space-y-2">
+                  <Label>Location (City)</Label>
+                  <Popover open={open} onOpenChange={setOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={open}
+                        className="w-full justify-between font-normal"
+                      >
+                        {selectedCityId
+                          ? cities.find((city) => city.id === selectedCityId)?.name || watch("location") || "Select city..."
+                          : "Select city..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[400px] h-[200px] overflow-y-auto p-0" align="start">
+                      <Command shouldFilter={false}>
+                        <CommandInput
+                          placeholder="Search city..."
+                          onValueChange={setCitySearch}
+                        />
+                        <CommandList>
+                          {loadingCities && <div className="p-4 text-center text-sm text-muted-foreground">Searching...</div>}
+                          {!loadingCities && cities.length === 0 && (
+                            <CommandEmpty>No city found.</CommandEmpty>
+                          )}
+                          <CommandGroup>
+                            {cities.map((city) => (
+                              <CommandItem
+                                key={city.id}
+                                value={city.id.toString()}
+                                onSelect={() => {
+                                  setValue("cityId", city.id);
+                                  setValue("location", `${city.name}, ${city.state}`);
+                                  setOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    selectedCityId === city.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {city.name}, {city.state}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
 
-            {/* Action Buttons */}
-            <div className="flex gap-3 pt-4">
-              <Button
-                type="submit"
-                variant="hero"
-                disabled={loading}
-                className="flex-1"
-              >
-                <Save className="w-4 h-4 mr-2" />
-                {loading ? "Saving..." : "Save Changes"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleCancel}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-            </div>
-          </form>
-        </div>
+
+            </CardContent>
+          </Card>
+
+          {/* Account Info */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex gap-2 items-center">
+                <Calendar className="w-5 h-5" /> Account Information
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent className="grid md:grid-cols-2 gap-4 text-sm">
+              <div className="space-y-1">
+                <span className="text-muted-foreground">Email</span>
+                <p className="font-medium">{profile?.email}</p>
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-muted-foreground">Member Since</span>
+                <p className="font-medium">
+                  {profile?.joined_date
+                    ? new Date(profile.joined_date).toLocaleDateString("en-IN", {
+                      year: "numeric",
+                      month: "long",
+                    })
+                    : ""}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-4">
+            <Button
+              type="submit"
+              variant="hero"
+              disabled={isSubmitting}
+              className="flex-1"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {isSubmitting ? "Saving..." : "Save Changes"}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate("/profile")}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
       </div>
     </AppLayout>
   );

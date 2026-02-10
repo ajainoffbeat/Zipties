@@ -42,16 +42,13 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   initializeAuth: () => {
     const token = getTokenFromCookie();
-    console.log("token ---", token);
     if (!token) {
       set({ isInitialized: true });
       return;
     }
 
     try {
-      console.log("token --->>>", token);
       const decoded = jwtDecode<JwtPayload>(token);
-      console.log("decoded --->>>", decoded);
       set({
         token,
         userId: decoded?.userId,

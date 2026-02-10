@@ -4,15 +4,6 @@ import { validateLoginMiddleware, validateSignupMiddleware } from "../middleware
 
 
 const router = Router();
-/**
- * POST /login
- * @summary Authenticate user and return login token
- * @tags Auth
- * @param {object} request.body.required - User credentials
- * @param {string} request.body.email.required - User email
- * @param {string} request.body.password.required - User password
- * 
- */
 router.post("/login",validateLoginMiddleware, login);
 router.post("/signup",validateSignupMiddleware,signup);
 router.post("/forgot-password",forgotPassword);
