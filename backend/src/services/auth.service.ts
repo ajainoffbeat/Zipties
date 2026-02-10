@@ -4,7 +4,7 @@ export const createUser = async (newUser:any) =>{
   console.log("result inside querry 123",newUser)
 
  const result = await pool.query(
-    "SELECT * FROM create_user($1, $2, $3, $4)",
+    "SELECT * FROM fn_create_user($1, $2, $3, $4)",
     [newUser.email, newUser.password_hash, newUser.first_name, newUser.last_name]
   );
   console.log("result inside querry",result)
@@ -13,7 +13,7 @@ export const createUser = async (newUser:any) =>{
 
 export const getUserByEmail = async (email: string) => {
   const result = await pool.query(
-    "SELECT * FROM get_user_by_email($1)",
+    "SELECT * FROM fn_get_user_by_email($1)",
     [email.toLowerCase().trim()]
   );
 
@@ -36,7 +36,7 @@ export const updateUserPasswordResetToken = async (
 
 export const logUserLogin = async (userId: string) => {
   const result = await pool.query(
-    "SELECT log_for_user_login ($1) AS log_id",
+    "SELECT fn_log_for_user_login ($1) AS log_id",
     [userId]
   );
 
@@ -45,7 +45,7 @@ export const logUserLogin = async (userId: string) => {
 
 export const logUserLogout = async (userId: string): Promise<boolean> => {
   const result = await pool.query(
-    "SELECT log_for_user_logout($1) AS success",
+    "SELECT fn_log_for_user_logout($1) AS success",
     [userId]
   );
 

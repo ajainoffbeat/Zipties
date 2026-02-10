@@ -9,7 +9,7 @@ export const checkRateLimit = async (
   request_body:string
 ): Promise<boolean> => {
   const { rows } = await pool.query<RateLimitResult>(
-    `SELECT check_rate_limit($1, $2, $3, $4, $5) AS allowed`,
+    `SELECT fn_check_rate_limit($1, $2, $3, $4, $5) AS allowed`,
     [ipAddress, limit, windowSeconds,req_url,request_body]
   );
 
