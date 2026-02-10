@@ -85,7 +85,7 @@ export const signup = async (
     console.log("password",hashedPassword)
     // Create user object
     const newUser = {
-      email:email,
+      email:email.toLowerCase().trim(),
       password_hash: hashedPassword,
       first_name: firstName,
       last_name: lastName,
