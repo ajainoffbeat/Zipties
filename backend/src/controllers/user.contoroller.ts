@@ -1,7 +1,7 @@
 import type { Response, Request, NextFunction } from "express";
 import { decodeToken, extractBearerToken } from "../utils/jwt.util.js";
-import { userProfile, updateUserProfile } from "../services/user.service.js";
-import { AppError } from "../utils/response/appError.js";   
+import { userProfile, updateUserProfile, getUsCities } from "../services/user.service.js";
+import { AppError } from "../utils/response/appError.js";
 import { sendSuccess } from "../utils/response/appSuccess.js";
 import { RESPONSE_CODES } from "../constants/responseCode.constant.js";
 
@@ -12,11 +12,8 @@ export const getProfile = async (
   next: NextFunction
 ) => {
   try {
-    const { userId }:any = req.params;
-    console.log("userId", userId);
-
+    const { userId }: any = req.params;
     const rows = await userProfile(userId);
-    console.log("rows", rows);
     if (!rows) {
       return res.status(404).json({ message: "Profile not found" });
     }
@@ -40,16 +37,10 @@ export const editProfile = async (
     const decoded = decodeToken(token);
     const userId = decoded.userId;
     const profileData = req.body;
-    const nameParts = profileData.name?.trim().split(" ");
-    const firstName = nameParts?.[0] || null;
-    const lastName = nameParts?.slice(1).join(" ") || null;
     const isUpdated = await updateUserProfile(
       userId,
-      firstName,
-      lastName,
       profileData
     );
-    console.log("isUpdated", isUpdated);
     if (!isUpdated) {
       throw new AppError(400, "Failed to update profile", {
         code: RESPONSE_CODES.BAD_REQUEST,
@@ -60,6 +51,26 @@ export const editProfile = async (
     sendSuccess(res, {
       status: 200,
       message: "Profile updated successfully",
+      code: RESPONSE_CODES.SUCCESS,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+export const getCities = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { q } = req.query;
+    const result = await getUsCities('US', q as string);
+    sendSuccess(res, {
+      data: result,
+      status: 200,
+      message: "cities fetched successfully",
       code: RESPONSE_CODES.SUCCESS,
     });
   } catch (error) {
