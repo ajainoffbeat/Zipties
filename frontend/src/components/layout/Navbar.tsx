@@ -162,12 +162,12 @@ export function Navbar() {
                           <Avatar className="w-10 h-10 border border-border">
                             <AvatarImage src={`http://localhost:5000${user.profile_image_url}`} />
                             <AvatarFallback className="bg-primary/5 text-primary">
-                              {user.firstname?.[0]}{user.lastname?.[0]}
+                              {user.first_name?.[0]}{user.last_name?.[0]}
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold truncate">
-                              {user.firstname} {user.lastname}
+                              {user.first_name} {user.last_name}
                             </p>
                             <p className="text-xs text-muted-foreground truncate">{user.username}</p>
                           </div>

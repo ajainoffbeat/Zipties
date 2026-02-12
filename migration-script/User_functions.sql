@@ -203,46 +203,37 @@ $$;
 -- Created On    : 29/01/2025
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.fn_get_cities(
-    p_country_code character varying,
-    p_state character varying DEFAULT NULL,
-    p_search character varying DEFAULT NULL,
-    p_limit integer DEFAULT 50,
-    p_offset integer DEFAULT 0
-)
-RETURNS TABLE (
-    id uuid,
-    name character varying(100),
-    city character varying(100),
-    state character varying(100)
-)
-LANGUAGE plpgsql
-VOLATILE
-AS $BODY$
-BEGIN
-    RETURN QUERY
-    SELECT
-        c.id,
-        c.name,
-        c.city,
-        c.state
-    FROM city c
-    WHERE c.country_code = p_country_code
-      AND c.is_active = true
-      AND (
-          NULLIF(TRIM(p_state), '') IS NULL
-          OR c.state ILIKE '%' || TRIM(p_state) || '%'
-      )
-      AND (
-          NULLIF(TRIM(p_search), '') IS NULL
-          OR c.city ILIKE '%' || TRIM(p_search) || '%'
-          OR c.name ILIKE '%' || TRIM(p_search) || '%'
-      )
-    ORDER BY c.city
-    LIMIT p_limit
-    OFFSET p_offset;
+        p_country_code character varying,
+        p_state character varying DEFAULT NULL,
+        p_search character varying DEFAULT NULL,
+        p_limit integer DEFAULT 50,
+        p_offset integer DEFAULT 0
+    ) RETURNS TABLE (
+        id uuid,
+        name character varying(100),
+        city character varying(100),
+        state character varying(100)
+    ) LANGUAGE plpgsql VOLATILE AS $BODY$ BEGIN RETURN QUERY
+SELECT c.id,
+    c.name,
+    c.city,
+    c.state
+FROM city c
+WHERE c.country_code = p_country_code
+    AND c.is_active = true
+    AND (
+        NULLIF(TRIM(p_state), '') IS NULL
+        OR c.state ILIKE '%' || TRIM(p_state) || '%'
+    )
+    AND (
+        NULLIF(TRIM(p_search), '') IS NULL
+        OR c.city ILIKE '%' || TRIM(p_search) || '%'
+        OR c.name ILIKE '%' || TRIM(p_search) || '%'
+    )
+ORDER BY c.city
+LIMIT p_limit OFFSET p_offset;
 END;
 $BODY$;
-
 -- ============================================================================
 -- Function Name : fn_search_users_by_name
 -- Purpose       : Searches for users by first name, last name, or username.
@@ -251,38 +242,33 @@ $BODY$;
 -- Created On    : 11/02/2025
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.fn_search_users_by_name(
-    p_query VARCHAR,
-    p_current_user_id UUID
-)
-RETURNS TABLE (
-    id uuid,
-    first_name text,
-    last_name text,
-    username character varying,
-    profile_image_url character varying
-)
-LANGUAGE plpgsql
-AS $BODY$
-BEGIN
-    RETURN QUERY
-    SELECT 
-        u.id,
-        u.firstname::text AS first_name,
-        u.lastname::text AS last_name,
-        u.username,
-        u.profile_image_url
-    FROM "user" u
-    WHERE (
-        u.firstname ILIKE '%' || p_query || '%' OR
-        u.lastname ILIKE '%' || p_query || '%' OR
-        u.username ILIKE '%' || p_query || '%'
+        p_query character varying,
+        p_current_user_id uuid
+    ) RETURNS TABLE(
+        id uuid,
+        first_name text,
+        last_name text,
+        username character varying,
+        profile_image_url character varying
+    ) LANGUAGE 'plpgsql' COST 100 VOLATILE PARALLEL UNSAFE ROWS 1000 AS $BODY$ BEGIN RETURN QUERY
+SELECT u.id,
+    u.firstname::text AS first_name,
+    u.lastname::text AS last_name,
+    u.username,
+    u.profile_image_url
+FROM "user" u
+WHERE (
+        u.firstname ILIKE '%' || p_query || '%'
+        OR u.lastname ILIKE '%' || p_query || '%'
+        OR u.username ILIKE '%' || p_query || '%'
     )
     AND u.id != p_current_user_id
     AND NOT EXISTS (
-        SELECT 1 FROM user_report ur
-        WHERE (ur.user_id = p_current_user_id AND ur.blocked_user_id = u.id)
-           OR (ur.user_id = u.id AND ur.blocked_user_id = p_current_user_id)
+        SELECT 1
+        FROM user_report ur
+        WHERE ur.user_id = u.id
+            AND ur.blocked_user_id = p_current_user_id
     )
-    LIMIT 10;
+LIMIT 10;
 END;
 $BODY$;

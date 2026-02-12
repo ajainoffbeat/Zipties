@@ -27,8 +27,8 @@ async function extractFunctionsFromSQL(content: string, filename: string): Promi
   
   // Find all CREATE OR REPLACE FUNCTION statements with robust parameter matching
   // This regex handles the compacted content
-  const createFunctionRegex = /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+(?:public\.)?(\w+)\s*\([^)]*\)/gis;
-  
+  // const createFunctionRegex = /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+(?:public\.)?(\w+)\s*\([^)]*\)/gis;
+  const createFunctionRegex = /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+(?:public\.)?([a-zA-Z0-9_]+)\s*\([^)]*\)/gis;
   let match;
   while ((match = createFunctionRegex.exec(compactContent)) !== null) {
     const functionName = match[1];

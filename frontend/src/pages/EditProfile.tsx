@@ -76,7 +76,7 @@ export default function EditProfile() {
         lastName: profile.last_name || "",
         username: profile.username || "",
         bio: profile.bio || "",
-        location: profile.location || "",
+        location: profile.city_name || "",
         profileImageUrl: profile.profile_image_url || "",
         interests: profile.interests || "",
         tags: profile.tags || "",
