@@ -1,0 +1,57 @@
+--- DB DEBUG ---
+User Columns:
+[
+  "id",
+  "firstname",
+  "lastname",
+  "username",
+  "email",
+  "password",
+  "is_verified",
+  "is_active",
+  "is_blocked",
+  "status_id",
+  "city_id",
+  "bio",
+  "profile_image_url",
+  "interests",
+  "tags",
+  "reset_password_token",
+  "token_expires_at",
+  "blocked_at",
+  "created_by",
+  "created_at",
+  "updated_by",
+  "updated_at",
+  "socket_id",
+  "socket_connected_at"
+]
+
+Sample User:
+{
+  "id": "01970161-7c5d-4654-bd1f-17f625076576",
+  "firstname": "Abhay",
+  "lastname": "",
+  "username": "abhay@gmail.com",
+  "email": "abhay@gmail.com",
+  "password": "$2b$12$uoIc.kgFNd2lbl8ZBCu3puJmIsQJapr5TYB57LBQYNm78Ra7pvXxC",
+  "is_verified": false,
+  "is_active": true,
+  "is_blocked": false,
+  "status_id": "c9f1669f-ec39-4694-a268-3eead4ad9f13",
+  "city_id": null,
+  "bio": null,
+  "profile_image_url": null,
+  "interests": null,
+  "tags": null,
+  "reset_password_token": null,
+  "token_expires_at": null,
+  "blocked_at": null,
+  "created_by": null,
+  "created_at": "2026-02-11T09:01:11.991Z",
+  "updated_by": null,
+  "updated_at": "2026-02-11T09:01:11.991Z",
+  "socket_id": null,
+  "socket_connected_at": null
+}
+
