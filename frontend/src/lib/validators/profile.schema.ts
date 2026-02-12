@@ -14,12 +14,13 @@ export const profileSchema = z.object({
     .or(z.literal("")),
   profileImageUrl: z
     .string()
-    .url("Invalid image URL")
+    // .url("Invalid image URL")
     .optional()
     .or(z.literal("")),
   interests: z.string().optional(),
   tags: z.string().optional(),
   cityId: z.number().optional().or(z.string().optional()),
+  cityName: z.string().optional(),
 });
 
 export type ProfileFormValues = z.infer<typeof profileSchema>;

@@ -1,6 +1,6 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -17,56 +17,113 @@ import {
   MoreHorizontal
 } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
 
-const mockUser = {
-  name: "John Doe",
-  username: "@johndoe",
-  initials: "JD",
-  bio: "Designer & Developer. Building tools for communities. Love connecting with like-minded people!",
-  location: "San Francisco, CA",
-  website: "johndoe.com",
-  joinedDate: "January 2024",
-  followers: 1240,
-  following: 890,
-  posts: 42,
-  proposals: 5,
-  listings: 8,
-};
 
-const mockPosts = [
-  {
-    id: 1,
-    content: "Just finished my latest project! Can't wait to share it with everyone. 🚀",
-    likes: 89,
-    comments: 12,
-    timeAgo: "2h",
-  },
-  {
-    id: 2,
-    content: "Looking forward to the community meetup next week. Who else is going?",
-    likes: 45,
-    comments: 23,
-    timeAgo: "1d",
-  },
-];
+import { useParams } from "react-router-dom";
+import { createConversation } from "@/lib/api/chat.api";
+import { useToast } from "@/components/ui/use-toast";
 
+import { Ban } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { blockUser } from "@/lib/api/block.api";
 
 export default function Profile() {
-  const { profile, fetchProfile, loading } = useProfileStore();
+  const { userId } = useParams();
+  const { profile, publicProfile, fetchProfile, fetchProfileByUsername, loading } = useProfileStore();
   const navigate = useNavigate();
-  const userId = useAuthStore((s) => s.userId);
+  const loggedInUserId = useAuthStore((s) => s.userId);
+  const { toast } = useToast();
+  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+  const [isBlocking, setIsBlocking] = useState(false);
 
   useEffect(() => {
-    fetchProfile(userId);
-  }, []);
+    if (userId) {
+      fetchProfileByUsername(userId);
+    } else if (loggedInUserId) {
+      fetchProfile(loggedInUserId);
+    }
+  }, [userId, loggedInUserId]);
+
+  const displayProfile = userId ? publicProfile : profile;
+  const isOwnProfile = !userId || (displayProfile?.id === loggedInUserId);
 
   const handleEditProfile = () => {
     navigate("/edit-profile");
   };
 
+  const handleMessage = async () => {
+    if (!displayProfile?.id || !loggedInUserId) return;
+
+    try {
+      const res = await createConversation([loggedInUserId, displayProfile.id]);
+      const conversationId = res.data.data.conversation_id;
+      navigate(`/messages?id=${conversationId}`);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to start conversation",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleBlockUser = async () => {
+    if (!displayProfile?.id) return;
+    setIsBlocking(true);
+    try {
+      await blockUser(displayProfile.id, true);
+      toast({
+        title: "User Blocked",
+        description: `${displayProfile.first_name} has been blocked.`,
+      });
+      setBlockDialogOpen(false);
+      navigate("/feed"); // Navigate away after blocking
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to block user.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsBlocking(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-[60vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-primary" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (userId && !publicProfile && !loading) {
+    return (
+      <AppLayout>
+        <div className="text-center py-20">
+          <h2 className="text-2xl font-bold">User Not Found</h2>
+          <p className="text-muted-foreground mb-6">This user might have blocked you or their account is private.</p>
+          <Button variant="link" onClick={() => navigate("/feed")}>Go to Feed</Button>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  console.log("displayProfile", displayProfile);
   return (
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
@@ -75,9 +132,14 @@ export default function Profile() {
           <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-sm mb-6 p-6 md:p-8">
             <div className="flex flex-col md:flex-row gap-6 md:items-start">
               {/* Avatar section */}
-              <Avatar className="w-24 h-24 md:w-32 md:h-32 border-4 border-background shadow-md shrink-0">
-                <AvatarFallback className="bg-primary/10 text-primary text-2xl md:text-3xl font-bold">
-                  {profile?.first_name?.charAt(0)}{profile?.last_name?.charAt(0)}
+              <Avatar className="w-24 h-24 md:w-32 md:h-32 border-4 border-background shadow-xl">
+                <AvatarImage
+                  src={`http://localhost:5000${displayProfile?.profile_image_url}`}
+                  alt="Profile image"
+                />
+                <AvatarFallback className="bg-primary/5 text-primary text-2xl md:text-4xl font-bold">
+                  {displayProfile?.first_name?.[0]}
+                  {displayProfile?.last_name?.[0]}
                 </AvatarFallback>
               </Avatar>
 
@@ -85,35 +147,77 @@ export default function Profile() {
               <div className="flex-1 min-w-0">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
                   <div>
-                    <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-                      {profile?.first_name} {profile?.last_name}
+                    <h1 className="text-2xl md:text-4xl font-bold text-foreground mb-1">
+                      {displayProfile?.first_name} {displayProfile?.last_name}
                     </h1>
-                    <p className="text-muted-foreground">{profile?.username}</p>
+                    <p className="text-muted-foreground">@{displayProfile?.username}</p>
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="gap-1 px-4" onClick={handleEditProfile}>
-                      <Edit2 className="w-4 h-4" />
-                      Edit Profile
-                    </Button>
+                  <div className="flex flex-wrap gap-2">
+                    {isOwnProfile ? (
+                      <Button variant="outline" size="sm" className="gap-1 px-4" onClick={handleEditProfile}>
+                        <Edit2 className="w-4 h-4" />
+                        Edit Profile
+                      </Button>
+                    ) : (
+                      <>
+                        <Button variant="hero" size="sm" className="gap-1 px-4" onClick={handleMessage}>
+                          <MessageCircle className="w-4 h-4" />
+                          Message
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1 px-4 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => setBlockDialogOpen(true)}
+                        >
+                          <Ban className="w-4 h-4" />
+                          Block
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
 
+                <AlertDialog open={blockDialogOpen} onOpenChange={setBlockDialogOpen}>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Block {displayProfile?.first_name}?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        They won't be able to message you or find your profile in search. You can unblock them later from your settings.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={isBlocking}>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleBlockUser();
+                        }}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        disabled={isBlocking}
+                      >
+                        {isBlocking ? "Blocking..." : "Block User"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
                 <p className="text-foreground text-sm md:text-base leading-relaxed mb-4 max-w-2xl">
-                  {profile?.bio}
+                  {displayProfile?.bio}
                 </p>
 
                 <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground mb-6">
-                  {profile?.city_name && (
+                  {displayProfile?.city_name && (
                     <span className="flex items-center gap-1.5 font-medium">
                       <MapPin className="w-4 h-4 text-primary" />
-                      {profile.city_name}
+                      {displayProfile.city_name}
                     </span>
                   )}
                   <span className="flex items-center gap-1.5 font-medium">
                     <Calendar className="w-4 h-4 text-primary" />
                     Joined{" "}
-                    {profile?.joined_date
-                      ? new Date(profile.joined_date).toLocaleDateString("en-IN", {
+                    {displayProfile?.joined_date
+                      ? new Date(displayProfile.joined_date).toLocaleDateString("en-IN", {
                         year: "numeric",
                         month: "long",
                       })
@@ -121,40 +225,26 @@ export default function Profile() {
                   </span>
                 </div>
 
-                {/* <div className="flex gap-8 border-t border-border pt-6">
-                  <div className="flex flex-col">
-                    <span className="text-xl font-bold text-foreground">{mockUser.followers.toLocaleString()}</span>
-                    <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Followers</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-xl font-bold text-foreground">{mockUser.following.toLocaleString()}</span>
-                    <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Following</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-xl font-bold text-foreground">{mockUser.posts}</span>
-                    <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Posts</span>
-                  </div>
-                </div> */}
               </div>
             </div>
 
             {/* Tags/Interests Section */}
-            {(profile?.interests || profile?.tags) && (
+            {(displayProfile?.interests || displayProfile?.tags) && (
               <div className="mt-8 pt-6 border-t border-border space-y-4">
-                {profile?.interests && (
+                {displayProfile?.interests && (
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider mr-2">Interests:</span>
-                    {profile.interests.split(',').map((interest, i) => (
+                    {displayProfile.interests.split(',').map((interest, i) => (
                       <Badge key={i} variant="secondary" className="font-medium cursor-pointer hover:bg-secondary/80">
                         {interest.trim()}
                       </Badge>
                     ))}
                   </div>
                 )}
-                {profile?.tags && (
+                {displayProfile?.tags && (
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider mr-2">Skills:</span>
-                    {profile.tags.split(',').map((tag, i) => (
+                    {displayProfile.tags.split(',').map((tag, i) => (
                       <Badge key={i} variant="outline" className="font-medium cursor-pointer hover:border-primary">
                         {tag.trim()}
                       </Badge>
@@ -165,85 +255,6 @@ export default function Profile() {
             )}
           </div>
 
-          {/* Tabs */}
-          {/* <Tabs defaultValue="posts">
-            <TabsList className="w-full justify-start mb-6">
-              <TabsTrigger value="posts" className="gap-1">
-                <FileText className="w-4 h-4" />
-                Posts
-              </TabsTrigger>
-              <TabsTrigger value="proposals" className="gap-1">
-                <Users className="w-4 h-4" />
-                Proposals
-              </TabsTrigger>
-              <TabsTrigger value="listings" className="gap-1">
-                <ShoppingBag className="w-4 h-4" />
-                Listings
-              </TabsTrigger>
-              <TabsTrigger value="likes" className="gap-1">
-                <Heart className="w-4 h-4" />
-                Likes
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="posts" className="space-y-4">
-              {mockPosts.map((post) => (
-                <article
-                  key={post.id}
-                  className="bg-card rounded-xl border border-border p-5 shadow-sm"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="w-10 h-10">
-                        <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                          {mockUser.initials}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <span className="font-semibold text-foreground">{mockUser.name}</span>
-                        <span className="text-muted-foreground text-sm ml-2">{post.timeAgo}</span>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="icon" className="text-muted-foreground">
-                      <MoreHorizontal className="w-5 h-5" />
-                    </Button>
-                  </div>
-                  <p className="text-foreground mb-4">{post.content}</p>
-                  <div className="flex gap-4">
-                    <Button variant="ghost" size="sm" className="text-muted-foreground">
-                      <Heart className="w-4 h-4 mr-1" />
-                      {post.likes}
-                    </Button>
-                    <Button variant="ghost" size="sm" className="text-muted-foreground">
-                      <MessageCircle className="w-4 h-4 mr-1" />
-                      {post.comments}
-                    </Button>
-                  </div>
-                </article>
-              ))}
-            </TabsContent>
-
-            <TabsContent value="proposals">
-              <div className="text-center py-12 text-muted-foreground">
-                <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No proposals yet</p>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="listings">
-              <div className="text-center py-12 text-muted-foreground">
-                <ShoppingBag className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No listings yet</p>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="likes">
-              <div className="text-center py-12 text-muted-foreground">
-                <Heart className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No liked posts yet</p>
-              </div>
-            </TabsContent>
-          </Tabs> */}
         </div>
       </div>
     </AppLayout>

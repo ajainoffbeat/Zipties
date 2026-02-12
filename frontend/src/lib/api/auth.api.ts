@@ -18,11 +18,24 @@ export const forgotPassword = (data: { email: string }) =>
 export const resetPassword = (data: { token: string; password: string }) =>
   api.post("/reset-password", data);
 
-export const getProfile = (userId: string) =>
+export const getProfileByUsername = (username: string) =>
+  api.get(`/user/profile/username/${username}`);
+
+export const getProfileById = (userId: string) =>
   api.get(`/user/profile/${userId}`);
 
-export const editProfile = (data: any) =>
-  api.post("/user/editprofile", data);
+export const getProfile = () =>
+  api.get(`/user/profile`);
+
+export const searchUsers = (query: string) =>
+  api.get(`/user/search?q=${query}`);
 
 export const getCitiesList = (search?: string) =>
-  api.get(`/user/cities${search ?`?q=${search}` : ""}`);
+  api.get(`/user/cities${search ? `?q=${search}` : ""}`);
+
+export const uploadAvatar = (formData: FormData) =>
+  api.post("/user/upload-avatar", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });

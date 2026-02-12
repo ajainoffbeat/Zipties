@@ -18,12 +18,13 @@ const app: Application = express();
 
 app.use(
   cors({
-    origin: ["http://localhost:8080","http://localhost:8081"],
+    origin: ["http://localhost:8080", "http://localhost:8081"],
     credentials: true,
   })
 );
 app.set("trust proxy", true);
 app.use(express.json());
+app.use("/uploads", express.static("public/uploads"));
 // app.use(rateLimiter(RATE_LIMIT_REQ, RATE_LIMIT_TIME));
 
 app.use("/api", authRoutes);

@@ -22,6 +22,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.0.0",
     "@types/node": "^25.0.10",
     "@types/nodemailer": "^7.0.9",
     "@types/pg": "^8.16.0",
@@ -34,6 +35,8 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.987.0",
+    "@aws-sdk/lib-storage": "^3.987.0",
     "bad-words": "^4.0.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
@@ -41,6 +44,7 @@
     "express": "^5.2.1",
     "express-jsdoc-swagger": "^1.8.0",
     "jsonwebtoken": "^9.0.3",
+    "multer": "^2.0.2",
     "nodemailer": "^7.0.13",
     "pg": "^8.17.2",
     "socket.io": "^4.8.3",

@@ -18,6 +18,9 @@ export const blockUser = async (
 ) => {
   try {
     const { user_blocked, is_blocking, comment } = req.body as BlockUserRequest;
+    console.log("user_blocked", user_blocked);
+    console.log("is_blocking", is_blocking);
+    console.log("comment", comment);
 
     // Validate required fields
     if (!user_blocked) {

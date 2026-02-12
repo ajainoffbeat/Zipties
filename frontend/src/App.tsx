@@ -54,6 +54,7 @@ const App = () => {
             <Route element={<ProtectedRoute />}>
               <Route path="/feed" element={<Feed />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/profile/:userId" element={<Profile />} />
               <Route path="/edit-profile" element={<EditProfile />} />
               {/* future routes */}
               <Route path="/messages" element={<Messages />} />

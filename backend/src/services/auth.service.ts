@@ -1,13 +1,10 @@
 import { pool } from "../config/db.js";
 
-export const createUser = async (newUser:any) =>{
-  console.log("result inside querry 123",newUser)
-
- const result = await pool.query(
+export const createUser = async (newUser: any) => {
+  const result = await pool.query(
     "SELECT * FROM fn_create_user($1, $2, $3, $4)",
     [newUser.email, newUser.password_hash, newUser.first_name, newUser.last_name]
   );
-  console.log("result inside querry",result)
   return result.rows[0];
 }
 
@@ -17,7 +14,7 @@ export const getUserByEmail = async (email: string) => {
     [email.toLowerCase().trim()]
   );
 
-  return result.rows[0]; 
+  return result.rows[0];
 };
 
 export const updateUserPasswordResetToken = async (

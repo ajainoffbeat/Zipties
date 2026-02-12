@@ -6,6 +6,7 @@ interface Conversation {
   user: {
     name: string;
     initials: string;
+    avatar?: string;
   };
   lastMessage: string;
   time: string;

@@ -4,10 +4,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, User, MapPin, Calendar, Check, ChevronsUpDown } from "lucide-react";
+import { Save, User, MapPin, Calendar, Check, ChevronsUpDown, Upload } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
 import { useAuthStore } from "@/store/authStore";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,7 +15,7 @@ import {
   profileSchema,
   ProfileFormValues,
 } from "@/lib/validators/profile.schema";
-import { getCitiesList } from "@/lib/api/auth.api";
+import { getCitiesList, uploadAvatar } from "@/lib/api/auth.api";
 import { cn } from "@/lib/utils";
 import {
   Command,
@@ -61,6 +61,7 @@ export default function EditProfile() {
       interests: "",
       tags: "",
       cityId: "",
+      cityName: "",
     },
   });
 
@@ -76,10 +77,11 @@ export default function EditProfile() {
         username: profile.username || "",
         bio: profile.bio || "",
         location: profile.location || "",
-        profileImageUrl: profile.profileImageUrl || "",
+        profileImageUrl: profile.profile_image_url || "",
         interests: profile.interests || "",
         tags: profile.tags || "",
         cityId: profile.city_id || "",
+        cityName: profile.city_name || "",
       });
       if (profile.city_name) {
         setCitySearch(profile.city_name);
@@ -87,9 +89,10 @@ export default function EditProfile() {
     }
   }, [profile, reset]);
 
+  console.log(profile)
   const fetchCities = useCallback(
     debounce(async (search: string) => {
-      // Fetch even if search is empty to show initial list
+      console.log("search", search);
       setLoadingCities(true);
       try {
         const res = await getCitiesList(search);
@@ -112,10 +115,49 @@ export default function EditProfile() {
   const username = watch("username");
   const selectedCityId = watch("cityId");
 
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Local preview
+    const previewUrl = URL.createObjectURL(file);
+    setValue("profileImageUrl", previewUrl);
+    setSelectedFile(file);
+  };
+
+  useEffect(() => {
+    console.log("profileImageUrl", profileImageUrl);
+  }, [profileImageUrl]);
+
   const onSubmit = async (data: ProfileFormValues) => {
-    await updateProfile(data);
+    console.log("data", data);
+    let finalProfileImageUrl = data.profileImageUrl;
+
+    if (selectedFile) {
+      setUploadingImage(true);
+      const formData = new FormData();
+      formData.append("avatar", selectedFile);
+
+      try {
+        const res = await uploadAvatar(formData);
+        finalProfileImageUrl = res.data.data.url;
+      } catch (err) {
+        console.error("Failed to upload image", err);
+        setUploadingImage(false);
+        return; // Stop if upload fails
+      } finally {
+        setUploadingImage(false);
+      }
+    }
+
+    await updateProfile({ ...data, profile_image_url: finalProfileImageUrl } as any);
     navigate("/profile");
   };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <AppLayout>
@@ -123,20 +165,62 @@ export default function EditProfile() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Profile Image */}
           <Card>
-            <CardContent className="pt-6 flex gap-4 items-center">
-              <Avatar className="w-20 h-20">
-                {profileImageUrl ? (
-                  <img src={profileImageUrl} />
-                ) : (
-                  <AvatarFallback className="bg-primary/10 text-primary text-xl font-bold">
-                    {firstName?.[0] || username?.[0] || "U"}
-                  </AvatarFallback>
+            <CardContent className="pt-6 flex gap-6 items-center">
+              <div className="relative group">
+                <Avatar className="w-24 h-24 md:w-32 md:h-32 border-2 border-border">
+                  {profileImageUrl ? (
+                    <img src={profileImageUrl.startsWith('/uploads') ? `${profileImageUrl}` : profileImageUrl} className="object-cover w-full h-full" />
+                  ) : (
+                    <AvatarFallback className="bg-primary/10 text-primary text-2xl md:text-3xl font-bold">
+                      {firstName?.[0] || username?.[0] || "U"}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
+                {uploadingImage && (
+                  <div className="absolute inset-0 bg-background/50 flex items-center justify-center rounded-full">
+                    <div className="w-6 h-6 border-2 border-primary border-t-transparent animate-spin rounded-full" />
+                  </div>
                 )}
-              </Avatar>
+              </div>
 
-              <div className="flex-1">
-                <Label>Profile Image URL</Label>
-                <Input {...register("profileImageUrl")} />
+              <div className="flex-1 space-y-3">
+                <div className="space-y-1">
+                  <h3 className="font-semibold text-lg">Profile Picture</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Upload a high-resolution image to represent yourself.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingImage}
+                  >
+                    <Upload className="w-4 h-4" />
+                    {uploadingImage ? "Uploading..." : "Change Photo"}
+                  </Button>
+                  {profileImageUrl && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => setValue("profileImageUrl", "")}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
                 {errors.profileImageUrl && (
                   <p className="text-sm text-destructive">
                     {errors.profileImageUrl.message}
@@ -212,7 +296,7 @@ export default function EditProfile() {
                         className="w-full justify-between font-normal"
                       >
                         {selectedCityId
-                          ? cities.find((city) => city.id === selectedCityId)?.name || watch("location") || "Select city..."
+                          ? cities.find((city) => city.id === selectedCityId)?.city || watch("cityName") || "Select city..."
                           : "Select city..."}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
@@ -222,6 +306,7 @@ export default function EditProfile() {
                         <CommandInput
                           placeholder="Search city..."
                           onValueChange={setCitySearch}
+                          value={citySearch}
                         />
                         <CommandList>
                           {loadingCities && <div className="p-4 text-center text-sm text-muted-foreground">Searching...</div>}

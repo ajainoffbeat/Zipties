@@ -119,74 +119,109 @@ WHERE conversation_id = p_conversation_id
     AND user_id = p_user_id;
 END;
 $$ LANGUAGE plpgsql;
--- ============================================================================
--- Function Name : fn_get_user_inbox
--- Purpose       : Retrieves all conversations for a user with detailed information
---                 including unread counts, last message details, and block status.
---                 Returns inbox data sorted by most recent message activity.
--- Author        : OFFBEAT
--- Created On    : 29/01/2025
--- ============================================================================
-CREATE OR REPLACE FUNCTION public.fn_get_user_inbox(p_user_id UUID) RETURNS TABLE (
-        conversation_id UUID,
-        title VARCHAR,
-        type_name VARCHAR,
-        unread_count INT,
-        last_message_content TEXT,
-        last_message_at TIMESTAMP,
-        last_message_sender_id UUID,
-        last_message_sender_name TEXT,
-        source_type VARCHAR,
-        source_id UUID,
-        is_blocked BOOLEAN,
-        blocked_by UUID
-    ) AS $$ BEGIN RETURN QUERY
-SELECT c.id AS conversation_id,
-    c.title,
-    ct.name AS type_name,
-    cm.unread_count,
-    CASE
-        WHEN block_info.is_blocked THEN NULL
-        ELSE m.content
-    END AS last_message_content,
-    c.last_message_at,
-    m.sender_id AS last_message_sender_id,
-    u.username::TEXT AS last_message_sender_name,
-    cst.name AS source_type,
-    c.source_id,
-    COALESCE(block_info.is_blocked, FALSE),
-    block_info.blocked_by
-FROM conversation_member cm
-    JOIN conversation c ON cm.conversation_id = c.id
-    JOIN conversation_type ct ON c.conversation_type_id = ct.id
-    LEFT JOIN conversation_source_type cst ON c.conversation_source_type_id = cst.id
+-- FUNCTION: public.fn_get_user_inbox(uuid)
+
+-- DROP FUNCTION IF EXISTS public.fn_get_user_inbox(uuid);
+
+CREATE OR REPLACE FUNCTION public.fn_get_user_inbox(
+	p_user_id uuid)
+    RETURNS TABLE(conversation_id uuid, title character varying, type_name character varying, unread_count integer, last_message_content text, last_message_at timestamp without time zone, last_message_sender_id uuid, last_message_sender_name text, source_type character varying, source_id uuid, is_blocked boolean, blocked_by uuid, other_user_id uuid) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+BEGIN
+    RETURN QUERY
+    SELECT
+        c.id AS conversation_id,
+
+        -- 🔥 viewer-dependent title (Instagram-style)
+        CASE
+            WHEN ct.name = 'individual' THEN
+                COALESCE(
+                    NULLIF(trim(u_other.firstname || ' ' || u_other.lastname), ''),
+                    u_other.username
+                )
+            ELSE
+                c.title
+        END AS title,
+
+        ct.name AS type_name,
+        cm.unread_count,
+
+        CASE
+            WHEN block_info.is_blocked THEN NULL
+            ELSE m.content
+        END AS last_message_content,
+
+        c.last_message_at,
+        m.sender_id AS last_message_sender_id,
+        u_sender.username::text AS last_message_sender_name,
+        cst.name AS source_type,
+        c.source_id,
+
+        COALESCE(block_info.is_blocked, FALSE) AS is_blocked,
+        block_info.blocked_by,
+
+        cm_other.user_id AS other_user_id
+
+    FROM conversation_member cm
+    JOIN conversation c
+        ON cm.conversation_id = c.id
+    JOIN conversation_type ct
+        ON c.conversation_type_id = ct.id
+
+    -- 🔹 other participant (1-to-1)
+    JOIN conversation_member cm_other
+        ON cm_other.conversation_id = c.id
+       AND cm_other.user_id <> p_user_id
+
+    -- 🔹 other user's profile (for title)
+    JOIN public."user" u_other
+        ON u_other.id = cm_other.user_id
+
+    LEFT JOIN conversation_source_type cst
+        ON c.conversation_source_type_id = cst.id
+
+    -- 🔹 last message
     LEFT JOIN LATERAL (
-        SELECT content,
-            sender_id
+        SELECT m2.content, m2.sender_id
         FROM message m2
         WHERE m2.conversation_id = c.id
         ORDER BY m2.created_at DESC
         LIMIT 1
-    ) m ON true
-    LEFT JOIN "user" u ON m.sender_id = u.id
+    ) m ON TRUE
+
+    -- 🔹 last message sender
+    LEFT JOIN public."user" u_sender
+        ON u_sender.id = m.sender_id
+
+    -- 🔹 block info (either side)
     LEFT JOIN LATERAL (
-        SELECT TRUE AS is_blocked,
+        SELECT
+            TRUE AS is_blocked,
             ur.user_id AS blocked_by
         FROM user_report ur
         WHERE (
                 ur.user_id = p_user_id
-                AND ur.blocked_user_id = cm.user_id
-            )
-            OR (
-                ur.user_id = cm.user_id
-                AND ur.blocked_user_id = p_user_id
-            )
+            AND ur.blocked_user_id = cm_other.user_id
+        )
+        OR (
+                ur.user_id = cm_other.user_id
+            AND ur.blocked_user_id = p_user_id
+        )
         LIMIT 1
-    ) block_info ON true
-WHERE cm.user_id = p_user_id
-ORDER BY c.last_message_at DESC NULLS LAST;
+    ) block_info ON TRUE
+
+    WHERE cm.user_id = p_user_id
+    ORDER BY c.last_message_at DESC NULLS LAST;
 END;
-$$ LANGUAGE plpgsql;
+$BODY$;
+
+ALTER FUNCTION public.fn_get_user_inbox(uuid)
+    OWNER TO postgres;
 -- ============================================================================
 -- Function Name : fn_update_unread_counts
 -- Purpose       : Increments unread message count for all conversation members

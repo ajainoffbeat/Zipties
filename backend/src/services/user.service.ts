@@ -3,14 +3,12 @@ import { pool } from "../config/db.js";
 
 export const userProfile = async (
   userId: string
-) : Promise<any> =>{
-  console.log("userId", userId);
-  const result =  await pool.query(
-      `SELECT * FROM fn_get_user_profile($1)`,
-      [userId]
-    );
-    console.log("result", result);
-    return result.rows[0]
+): Promise<any> => {
+  const result = await pool.query(
+    `SELECT * FROM fn_get_user_profile($1)`,
+    [userId]
+  );
+  return result.rows[0]
 }
 
 
@@ -19,6 +17,7 @@ export const updateUserProfile = async (
   profileData: any
 ): Promise<boolean> => {
   try {
+    console.log(profileData);
     const result = await pool.query(
       `SELECT fn_update_user(
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
@@ -29,7 +28,7 @@ export const updateUserProfile = async (
         profileData.lastName || null,
         profileData.username || null,
         profileData.bio || null,
-        profileData.profileImageUrl || null,
+        profileData.profile_image_url || null,
         userId,
         profileData.cityId || null,
         profileData.interests || null,
@@ -51,6 +50,7 @@ export const getUsCities = async (
   offset = 0
 ): Promise<any[]> => {
   try {
+    console.log(countryCode, state, search, limit, offset)
     const result = await pool.query(
       `SELECT * FROM fn_get_cities($1, $2, $3, $4, $5)`,
       [
@@ -68,4 +68,14 @@ export const getUsCities = async (
     throw err;
   }
 };
+
+export const searchUsersByName = async (query: string, currentUserId: string): Promise<any[]> => {
+  const result = await pool.query(
+    `SELECT * FROM fn_search_users_by_name($1, $2)`,
+    [query, currentUserId]
+  );
+
+  return result.rows;
+};
+
 

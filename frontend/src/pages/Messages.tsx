@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Search,
   Send,
@@ -29,8 +29,11 @@ import { socket } from "@/lib/socket";
 import { useAuthStore } from "@/store/authStore";
 import { useProfileStore } from "@/store/useProfileStore";
 import { toast } from "sonner";
+import { useSearchParams } from "react-router-dom";
 
 export default function Messages() {
+  const [searchParams] = useSearchParams();
+  const targetConvoId = searchParams.get("id");
 
   const {
     conversations,
@@ -58,19 +61,30 @@ export default function Messages() {
 
   useEffect(() => {
     const loadInbox = async () => {
-      setSelectedConvo(null as any); // Clear selected convo on refresh/mount
       const data = await getInbox();
-      setConversations(normalizeInbox(data));
+      const normalizedInv = normalizeInbox(data);
+      setConversations(normalizedInv);
       if (userId) fetchProfile(userId);
+
+      // Auto-select if ID provided in query param
+      if (targetConvoId) {
+        const target = normalizedInv.find(c => c.id === targetConvoId);
+        if (target) {
+          setSelectedConvo(target);
+          const apiMessages = await getConversationMessages(target.id, 1000, 0);
+          setMessages(normalizeMessages(apiMessages, userId!));
+          if (apiMessages.length < 20) setHasMore(false);
+        }
+      } else {
+        setSelectedConvo(null as any);
+      }
     };
     loadInbox();
-  }, [userId]);
+  }, [userId, targetConvoId]);
 
-  const myInitials = profile?.name
-    ?.split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase() || "ME";
+  const myInitials = profile ?
+    `${profile.first_name?.[0] || ""}${profile.last_name?.[0] || ""}`.toUpperCase() || "ME"
+    : "ME";
 
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
@@ -136,6 +150,7 @@ export default function Messages() {
           .map((n: string) => n[0])
           .join("")
           .toUpperCase() ?? "U",
+        avatar: item.other_user_avatar,
       },
       lastMessage: item.last_message_content ?? "",
       time: new Date(item.last_message_at).toLocaleTimeString([], {
@@ -254,7 +269,10 @@ export default function Messages() {
   };
 
   const handleBlock = async (convo: any, isBlocking: boolean) => {
+    console.log("convo", convo);
     const targetUserId = convo.otherUserId;
+    console.log("targetUserId", targetUserId);
+    console.log("isBlocking", isBlocking);
     try {
       if (!targetUserId) {
         console.error("Cannot block: otherUserId is missing");
@@ -331,6 +349,7 @@ export default function Messages() {
                   >
                     <div className="relative">
                       <Avatar className="w-12 h-12">
+                        <AvatarImage src={`http://localhost:5000${convo.user.avatar}`} />
                         <AvatarFallback className="bg-primary/10 text-primary font-medium">
                           {convo.user.initials}
                         </AvatarFallback>
@@ -386,6 +405,7 @@ export default function Messages() {
                         <ChevronLeft className="h-5 w-5" />
                       </Button>
                       <Avatar className="w-10 h-10">
+                        <AvatarImage src={`http://localhost:5000${selectedConvo?.user?.avatar}`} />
                         <AvatarFallback className="bg-primary/10 text-primary font-medium">
                           {selectedConvo?.user?.initials}
                         </AvatarFallback>
