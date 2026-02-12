@@ -16,7 +16,7 @@ export const getProfile = async (
   try {
     const token = extractBearerToken(req.headers.authorization);
     const { userId } = decodeToken(token);
-    const rows = await userProfile(userId);
+    const rows = await userProfile(userId,userId);
     if (!rows) {
       return res.status(404).json({ message: "Profile not found" });
     }
@@ -147,8 +147,10 @@ export const getProfileById = async (
   next: NextFunction
 ) => {
   try {
-    const { userId } = req.params;
-    const user = await userService.userProfile(userId as string);
+    const { userId } = req.params;    
+    const token = extractBearerToken(req.headers.authorization);
+    const { userId: currentUserId } = decodeToken(token);
+    const user = await userService.userProfile(currentUserId,userId as string);
     sendSuccess(res, {
       data: user,
       status: 200,

@@ -16,13 +16,13 @@ END;
 $$;
 -- ============================================================================
 -- Function Name : fn_get_user_profile
--- Purpose       : Fetches a user's profile information.
---                 This function is primarily used during login to retrieve
---                 the user ID and hashed password.
+-- Purpose       : Fetches a user's profile information with blocking status.
+--                 Returns user profile data and indicates if the current user
+--                 has blocked the requested user or vice versa.
 -- Author        : OFFBEAT
 -- Created On    : 29/01/2025
 -- ============================================================================
-CREATE OR REPLACE FUNCTION public.fn_get_user_profile(p_user_id uuid) RETURNS TABLE(
+CREATE OR REPLACE FUNCTION public.fn_get_user_profile(p_current_user_id uuid,p_user_id uuid) RETURNS TABLE(
         id uuid,
         first_name text,
         last_name text,
@@ -34,7 +34,8 @@ CREATE OR REPLACE FUNCTION public.fn_get_user_profile(p_user_id uuid) RETURNS TA
         interests text,
         tags text,
         profile_image_url text,
-        joined_date timestamp without time zone
+        joined_date timestamp without time zone,
+        isblocked boolean
     ) LANGUAGE 'plpgsql' COST 100 STABLE PARALLEL UNSAFE ROWS 1000 AS $$ BEGIN RETURN QUERY
 SELECT u.id,
     u.firstname::text AS first_name,
@@ -47,8 +48,12 @@ SELECT u.id,
     u.interests,
     u.tags,
     u.profile_image_url::text,
-    -- varchar(100) → text (IMPORTANT)
-    u.created_at
+    u.created_at,
+    CASE WHEN EXISTS (
+        SELECT 1 
+        FROM user_report ur 
+        WHERE ur.blocked_user_id = u.id AND ur.user_id = p_current_user_id
+    ) THEN true ELSE false END AS isblocked
 FROM "user" u
     LEFT JOIN city c ON c.id = u.city_id
 WHERE u.id = p_user_id

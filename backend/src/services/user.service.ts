@@ -2,12 +2,14 @@
 import { pool } from "../config/db.js";
 
 export const userProfile = async (
+  currentUserId: string,
   userId: string
 ): Promise<any> => {
   const result = await pool.query(
-    `SELECT * FROM fn_get_user_profile($1)`,
-    [userId]
+    `SELECT * FROM fn_get_user_profile($1,$2)`,
+    [currentUserId,userId]
   );
+  console.log(result.rows[0]);
   return result.rows[0]
 }
 
