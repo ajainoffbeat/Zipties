@@ -1,8 +1,8 @@
 import { pool } from "../config/db.js";
+import { logger } from "../utils/logger.js";
 
 const inspectSocketFields = async () => {
   try {
-    console.log("🔍 Inspecting user table for socket fields...\n");
 
     // Check if socket fields exist
     const columnsResult = await pool.query(`
@@ -13,12 +13,8 @@ const inspectSocketFields = async () => {
       ORDER BY column_name;
     `);
 
-    console.log("Socket-related columns in user table:");
-    console.log(JSON.stringify(columnsResult.rows, null, 2));
-    console.log();
 
     // Check if socket functions exist
-    console.log("🔍 Checking socket functions...\n");
     const functionsResult = await pool.query(`
       SELECT routine_name
       FROM information_schema.routines
@@ -27,12 +23,8 @@ const inspectSocketFields = async () => {
       ORDER BY routine_name;
     `);
 
-    console.log("Socket functions:");
-    console.log(JSON.stringify(functionsResult.rows, null, 2));
-    console.log();
 
     // Test updating socket
-    console.log("🧪 Testing socket update...\n");
     
     // Create a test user
     const userResult = await pool.query(`
@@ -42,11 +34,9 @@ const inspectSocketFields = async () => {
     `, [`test_socket_${Date.now()}@example.com`, `test_socket_${Date.now()}`]);
     
     const testUser = userResult.rows[0];
-    console.log(`Created test user: ${testUser.username} (${testUser.id})`);
 
     // Update socket
     await pool.query("SELECT fn_update_user_socket($1, $2)", [testUser.id, 'test-socket-123']);
-    console.log("✅ Called fn_update_user_socket");
 
     // Verify socket was stored
     const verifyResult = await pool.query(`
@@ -55,12 +45,9 @@ const inspectSocketFields = async () => {
       WHERE id = $1
     `, [testUser.id]);
 
-    console.log("\nUser record after socket update:");
-    console.log(JSON.stringify(verifyResult.rows[0], null, 2));
 
     // Clear socket
     await pool.query("SELECT fn_clear_user_socket($1)", ['test-socket-123']);
-    console.log("\n✅ Called fn_clear_user_socket");
 
     // Verify socket was cleared
     const clearResult = await pool.query(`
@@ -69,12 +56,10 @@ const inspectSocketFields = async () => {
       WHERE id = $1
     `, [testUser.id]);
 
-    console.log("\nUser record after socket clear:");
-    console.log(JSON.stringify(clearResult.rows[0], null, 2));
 
   } catch (error: any) {
-    console.error("❌ Error:", error.message);
-    console.error(error);
+    logger.error('❌ Socket inspection error', { error: error.message });
+    logger.error('Socket inspection failed', { error });
   } finally {
     await pool.end();
   }

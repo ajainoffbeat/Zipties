@@ -2,15 +2,16 @@ import fs from 'fs';
 import path from 'path';
 import { pool } from '../config/db.js';
 import '../config/env.js';
+import { logger } from '../utils/logger.js';
 
 async function runSeedData(): Promise<void> {
-  console.log('🌱 Starting data seeding...');
+  logger.info('🌱 Starting data seeding...');
   
   try {
     // Test database connection first
-    console.log('🔌 Testing database connection...');
+    logger.info('🔌 Testing database connection...');
     await pool.query('SELECT NOW()');
-    console.log('✅ Database connection successful');
+    logger.info('✅ Database connection successful');
     
     // Check if seed data already exists
     const seedExists = await pool.query(`
@@ -21,7 +22,7 @@ async function runSeedData(): Promise<void> {
     `);
     
     if (seedExists.rows[0].exists) {
-      console.log('⏭️  Seed data already executed, skipping...');
+      logger.info('⏭️  Seed data already executed, skipping...');
       return;
     }
     
@@ -29,7 +30,7 @@ async function runSeedData(): Promise<void> {
     const functionsPath = path.join(process.cwd(), '..', 'migration-script', 'Seed_data.sql');
     const seedContent = fs.readFileSync(functionsPath, 'utf8');
     
-    console.log('📄 Executing seed data from Seed_data.sql...');
+    logger.info('📄 Executing seed data from Seed_data.sql...');
     
     await pool.query('BEGIN');
     await pool.query(seedContent);
@@ -41,17 +42,16 @@ async function runSeedData(): Promise<void> {
     `);
     
     await pool.query('COMMIT');
-    console.log('✅ Seed data executed successfully');
+    logger.info('✅ Seed data executed successfully');
     
   } catch (error) {
     await pool.query('ROLLBACK');
-    console.error('❌ Failed to execute seed data:', error);
+    logger.error('❌ Failed to execute seed data', { error });
     throw error;
   } finally {
     await pool.end();
-    console.log('🔌 Database connection closed');
   }
 }
 
 // Run the seeder
-runSeedData().catch(console.error);
+runSeedData().catch((error) => logger.error('Seed data execution failed', { error }));

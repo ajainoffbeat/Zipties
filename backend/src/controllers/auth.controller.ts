@@ -8,6 +8,7 @@ import { RESPONSE_CODES } from "../constants/responseCode.constant.js";
 import { RESPONSE_MESSAGES } from "../constants/responseMessages.constant.js";
 import crypto from "crypto";
 import { EmailService } from "../services/email.service.js";
+import { logger } from "../utils/logger.js";
 
 export const login = async (
   req: Request,
@@ -26,14 +27,14 @@ export const login = async (
       });
     }
 
-    const isPasswordValid = await comparePassword(password, user.password);
+    const isPasswordValid = await comparePassword(password, user.password || '');
     if (!isPasswordValid) {
       throw new AppError(401, RESPONSE_MESSAGES[1], {
         code: RESPONSE_CODES.INVALID_CREDS,
         success: false,
       });
     }
-
+    
      const loginLogId = await logUserLogin(user.user_id);
 
     if (!loginLogId) {
@@ -63,6 +64,7 @@ export const login = async (
       code: RESPONSE_CODES.SUCCESS,
     });
   } catch (err) {
+    logger.error('Login failed', { error: err });
     next(err);
   }
 };
@@ -74,15 +76,12 @@ export const signup = async (
 ) => {
   try {
     const { email, password, fullName } = req.body;
-    console.log("req.body",req.body)
-    // Spliting fullName
     const nameParts = fullName.trim().split(" ");
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(" ") || "";
 
     // Hash the password
     const hashedPassword = await hashPassword(password);
-    console.log("password",hashedPassword)
     // Create user object
     const newUser = {
       email:email.toLowerCase().trim(),
@@ -92,7 +91,6 @@ export const signup = async (
     };
 
     const result = await createUser(newUser);
-    console.log("result",result);
     if (result) {
       const token = generateToken({
         userId: result.user_id,
@@ -119,6 +117,7 @@ export const signup = async (
       success: false,
     });
   } catch (err) {
+    logger.error('Signup failed', { error: err });
     next(err);
   }
 };
@@ -191,9 +190,7 @@ export const logout = async (
 export const forgotPassword = async (req: Request, res: Response) => {
   const { email } = req.body;
 
-  console.log("email", email);
   const user = await getUserByEmail(email);
-  console.log("user", user);
   // // Do NOT reveal if email exists
   // if (!user.rows.length) {
   //   return res.json({
@@ -202,20 +199,16 @@ export const forgotPassword = async (req: Request, res: Response) => {
   // }
 
   const resetToken = crypto.randomBytes(32).toString("hex");
-  console.log("resetToken", resetToken);
   const hashedToken = crypto
     .createHash("sha256")
     .update(resetToken)
     .digest("hex");
-  console.log("hashedToken", hashedToken);
 
   const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 min
-  console.log("expires", expires);
 
   await updateUserPasswordResetToken(email, hashedToken, expires);
 
   const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${hashedToken}`;
-  console.log("resetLink", resetLink);
 
   await EmailService.sendResetPasswordEmail(email,resetLink);
 
@@ -229,17 +222,15 @@ export const verifyResetToken = async (
   res: Response
 ) => {
   const { token } = req.query;
-  console.log("token", token);
   if (!token || typeof token !== "string") {
     return res.status(400).json({ valid: false });
   }
 
   try {
     const isValid = await verifyPasswordResetToken(token);
-    console.log("isValid", isValid);
     return res.json({ valid: isValid });
   } catch (error) {
-    console.error("Token verification failed:", error);
+    logger.error("Token verification failed", { error });
     return res.status(500).json({ valid: false });
   }
 };

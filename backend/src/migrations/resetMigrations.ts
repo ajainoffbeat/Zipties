@@ -1,19 +1,20 @@
 import { pool } from '../config/db.js';
 import '../config/env.js';
+import { logger } from '../utils/logger.js';
 
 async function resetMigrations(): Promise<void> {
-  console.log('🔄 Resetting database migrations...');
+  logger.info('🔄 Resetting database migrations...');
   
   try {
     // Test database connection first
-    console.log('🔌 Testing database connection...');
+    logger.info('🔌 Testing database connection...');
     await pool.query('SELECT NOW()');
-    console.log('✅ Database connection successful');
+    logger.info('✅ Database connection successful');
     
     await pool.query('BEGIN');
     
     // Drop all functions dynamically
-    console.log('🗑️  Dropping all functions...');
+    logger.info('🗑️  Dropping all functions...');
     const functionsResult = await pool.query(`
       SELECT routine_name 
       FROM information_schema.routines 
@@ -26,14 +27,12 @@ async function resetMigrations(): Promise<void> {
       const dropStatement = `DROP FUNCTION IF EXISTS ${func.routine_name} CASCADE`;
       try {
         await pool.query(dropStatement);
-        console.log(`✅ Executed: ${dropStatement}`);
       } catch (error) {
-        console.log(`⚠️  Skipped: ${dropStatement}`);
       }
     }
     
     // Drop all tables dynamically (in correct order to handle dependencies)
-    console.log('🗑️  Dropping all tables...');
+    logger.info('🗑️  Dropping all tables...');
     
     // First drop all tables with foreign key constraints
     const tablesResult = await pool.query(`
@@ -56,18 +55,16 @@ async function resetMigrations(): Promise<void> {
       const dropStatement = `DROP TABLE IF EXISTS "${table.table_name}" CASCADE`;
       try {
         await pool.query(dropStatement);
-        console.log(`✅ Executed: ${dropStatement}`);
       } catch (error) {
-        console.log(`⚠️  Skipped: ${dropStatement}`);
       }
     }
     
     await pool.query('COMMIT');
-    console.log('🎉 Database reset completed! All tables and functions dropped.');
+    logger.info('🎉 Database reset completed! All tables and functions dropped.');
     
   } catch (error) {
     await pool.query('ROLLBACK');
-    console.error('💥 Database reset failed:', error);
+    logger.error('💥 Database reset failed', { error });
     throw error;
   } finally {
     await pool.end();

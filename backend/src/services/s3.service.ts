@@ -2,6 +2,7 @@ import { S3Client } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import { env } from "../config/env.js";
 import { AppError } from "../utils/response/appError.js";
+import { logger } from "../utils/logger.js";
 
 const s3Client = new S3Client({
     region: env.AWS_S3_REGION as string,
@@ -34,7 +35,7 @@ export const uploadToS3 = async (file: Express.Multer.File) => {
         // For S3, Location is usually the public URL if the bucket allows it
         return (result as any).Location || `https://${env.AWS_S3_BUCKET_NAME}.s3.${env.AWS_S3_REGION}.amazonaws.com/${(result as any).Key}`;
     } catch (error: any) {
-        console.error("S3 Upload Error:", error);
+        logger.error("S3 Upload Error", { error });
         throw new AppError(500, `Failed to upload to S3: ${error.message}`);
     }
 };

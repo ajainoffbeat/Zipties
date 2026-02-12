@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { logErrorToDB } from "../services/errorLogger.service.js";
 import { decodeToken, extractBearerToken } from "../utils/jwt.util.js";
+import { logger } from "../utils/logger.js";
 
 export const errorLogs = async (
   err: unknown,
@@ -29,7 +30,7 @@ export const errorLogs = async (
       });
     }
   } catch (e) {
-    console.error("ErrorLogs middleware failed:", e);
+    logger.error("ErrorLogs middleware failed", { error: e });
   }
 
   next(err);

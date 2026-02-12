@@ -1,4 +1,5 @@
 import { pool } from "../config/db.js";
+import { logger } from "../utils/logger.js";
 
 type LogErrorInput = {
   action: string;
@@ -27,7 +28,6 @@ export const logErrorToDB = async ({
       ]
     );
   } catch (err) {
-    // logging
-    console.error("Error logging failed:", err);
+    logger.error("Error logging failed", { error: err });
   }
 };

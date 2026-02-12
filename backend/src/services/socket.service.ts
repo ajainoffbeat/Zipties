@@ -1,6 +1,7 @@
 import { pool } from "../config/db.js";
 import type { Server } from "socket.io";
 import type { NewMessagePayload } from "../@types/conversation.types.js";
+import { logger } from "../utils/logger.js";
 
 let io: Server | null = null;
 
@@ -73,11 +74,9 @@ export const emitNewMessage = async (
   messagePayload: NewMessagePayload
 ): Promise<void> => {
   try {
-    console.log("socket testing",conversationId,senderId,messagePayload)
     const recipients = await getConversationSockets(conversationId, senderId);
-    console.log("recepients===>",recipients)
     if (!io) {
-      console.warn("Socket.IO not initialized, skipping emit");
+      logger.warn("Socket.IO not initialized, skipping emit");
       return;
     }
 
@@ -86,11 +85,11 @@ export const emitNewMessage = async (
       io!.to(recipient.socket_id).emit("new_message", messagePayload);
     });
 
-    console.log(
+    logger.info(
       `Emitted message to ${recipients.length} online recipient(s) in conversation ${conversationId}`
     );
   } catch (error) {
-    console.error("Error emitting new message:", error);
+    logger.error("Error emitting new message", { error });
     // Don't throw - socket emission failure shouldn't break the API
   }
 };
@@ -118,6 +117,6 @@ export const emitTypingIndicator = async (
       });
     });
   } catch (error) {
-    console.error("Error emitting typing indicator:", error);
+    logger.error("Error emitting typing indicator", { error });
   }
 };

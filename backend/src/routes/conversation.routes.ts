@@ -1,11 +1,11 @@
 import { Router } from "express";
-import * as conversationController from "../controllers/conversation.controller.js";
+import { createConversation, sendMessage, markConversationRead, getUserInbox, getConversationMessages } from "../controllers/conversation.controller.js";
 
 const router = Router();
-router.post("/create", conversationController.createConversation);
-router.post("/message", conversationController.sendMessage);
-router.post("/read", conversationController.markConversationRead);
-router.get("/inbox", conversationController.getUserInbox);
-router.get("/:id/messages", conversationController.getConversationMessages);
+router.post("/create", createConversation);
+router.post("/message", sendMessage);
+router.post("/read", markConversationRead);
+router.get("/inbox", getUserInbox);
+router.get("/:id/messages", getConversationMessages);
 
 export default router;

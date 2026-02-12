@@ -17,8 +17,6 @@ export const rateLimiter =
         query: req.query,
         body: { ...req.body, password: undefined },
       });
-      
-      // console.log("api rate",req)
       const allowed = await checkRateLimit(
         req.ip,
         req.url,

@@ -1,11 +1,12 @@
 import jwt, { type SignOptions, type Secret } from "jsonwebtoken";
- import { env } from "../config/env.js";
- import { AppError } from "../utils/response/appError.js";
+import { env } from "../config/env.js";
+import { AppError } from "../utils/response/appError.js";
 import type { AuthPayload } from "../@types/auth.js";
- 
+import { logger } from "../utils/logger.js";
+
 const JWT_SECRET: Secret = env.JWT_SECRET as Secret;
 const JWT_EXPIRES_IN: SignOptions["expiresIn"] = env.JWT_EXPIRES_IN as SignOptions["expiresIn"] || '1d';
- 
+
 interface JwtPayload {
   userId: string;
   email: string;
@@ -20,7 +21,7 @@ export const verifyToken = (token: string): JwtPayload | null => {
   try {
     return jwt.verify(token, JWT_SECRET) as JwtPayload;
   } catch (err) {
-    console.error("JWT verification failed:", err);
+    logger.error("JWT verification failed", { error: err });
     return null;
   }
 };
@@ -35,6 +36,7 @@ export const decodeToken = (token: string): AuthPayload => {
 
     return decoded;
   } catch (err) {
+    logger.error("JWT verification failed", { error: err });
     throw new AppError(401, "Invalid or expired token");
   }
 };

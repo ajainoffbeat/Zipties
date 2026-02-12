@@ -1,12 +1,11 @@
 import type { Response, Request, NextFunction } from "express";
 import { decodeToken, extractBearerToken } from "../utils/jwt.util.js";
-import * as userService from "../services/user.service.js";
+import { getUsCities, updateUserProfile, userProfile, searchUsersByName, blockUser as blockUserService } from "../services/user.service.js";
 import { uploadToS3 } from "../services/s3.service.js";
 import { AppError } from "../utils/response/appError.js";
 import { sendSuccess } from "../utils/response/appSuccess.js";
 import { RESPONSE_CODES } from "../constants/responseCode.constant.js";
-import { getUsCities, updateUserProfile, userProfile } from "../services/user.service.js";
-
+import type { BlockUserRequest } from "../@types/block.types.js";
 
 export const getProfile = async (
   req: Request,
@@ -96,7 +95,7 @@ export const searchUsers = async (
     const token = extractBearerToken(req.headers.authorization);
     const { userId: currentUserId } = decodeToken(token);
 
-    const users = await userService.searchUsersByName(q as string, currentUserId);
+    const users = await searchUsersByName(q as string, currentUserId);
     sendSuccess(res, {
       data: users,
       status: 200,
@@ -117,13 +116,10 @@ export const uploadAvatar = async (
     if (!(req as any).file) {
       throw new AppError(400, "No file uploaded");
     }
-
     const fileUrl = await uploadToS3((req as any).file);
-    console.log(fileUrl);
     const token = extractBearerToken(req.headers.authorization);
     const { userId } = decodeToken(token);
     const isUpdated = await updateUserProfile(userId, { profile_image_url: fileUrl });
-    console.log("isupdated ", isUpdated);
     if (!isUpdated) {
       throw new AppError(400, "Failed to update profile", {
         code: RESPONSE_CODES.BAD_REQUEST,
@@ -150,7 +146,7 @@ export const getProfileById = async (
     const { userId } = req.params;    
     const token = extractBearerToken(req.headers.authorization);
     const { userId: currentUserId } = decodeToken(token);
-    const user = await userService.userProfile(currentUserId,userId as string);
+    const user = await userProfile(currentUserId,userId as string);
     sendSuccess(res, {
       data: user,
       status: 200,
@@ -162,3 +158,52 @@ export const getProfileById = async (
   }
 };
 
+export const blockUser = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { user_blocked, is_blocking, comment } = req.body as BlockUserRequest;
+    // Validate required fields
+    if (!user_blocked) {
+      throw new AppError(400, "user_blocked is required", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    // Extract and verify token
+    const token = extractBearerToken(req.headers.authorization);
+    const { userId } = decodeToken(token);
+
+    // Use userId from token as user_blocking
+    const user_blocking = userId;
+
+    // Ensure the authenticated user is not trying to block themselves
+    if (user_blocking === user_blocked) {
+      throw new AppError(400, "Users cannot block themselves", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    // Call the service to block or unblock the user
+    const blockResult = await blockUserService(
+      user_blocked,
+      user_blocking,
+      is_blocking !== false, // Default to true if not provided
+      comment
+    );
+
+    const action = is_blocking === false ? "unblocked" : "blocked";
+
+    sendSuccess(res, {
+      status: RESPONSE_CODES.SUCCESS,
+      message: `User ${action} successfully`,
+      data: blockResult,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

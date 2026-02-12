@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
-import * as chatService from "../services/chat.service.js";
-import * as socketService from "../services/socket.service.js";
+import { getOrCreateConversation as getOrCreateConversationService, sendMessage as sendMessageService, markConversationRead as markConversationReadService, getUserInbox as getUserInboxService, getConversationMessages as getConversationMessagesService } from "../services/chat.service.js";
 import { Filter } from "bad-words";
+import { logger } from "../utils/logger.js";
 
 import type {
   CreateConversationRequest,
@@ -11,6 +11,7 @@ import type {
   NewMessagePayload,
 } from "../@types/conversation.types.js";
 import { decodeToken, extractBearerToken } from "../utils/jwt.util.js";
+import { emitNewMessage } from "../services/socket.service.js";
 
 /**
  * Create or get conversation
@@ -24,7 +25,7 @@ export const createConversation = async (req: Request, res: Response) => {
     
  // From auth middleware
 
-    const conversationId = await chatService.getOrCreateConversation(
+    const conversationId = await getOrCreateConversationService(
       user_ids,
       type_name || "individual",
       source_type_name,
@@ -38,7 +39,7 @@ export const createConversation = async (req: Request, res: Response) => {
       data: { conversation_id: conversationId },
     });
   } catch (error: any) {
-    console.error("Error creating conversation:", error);
+    logger.error("Error creating conversation", { error });
     res.status(500).json({
       status: 1,
       message: error.message || "Failed to create conversation",
@@ -57,9 +58,8 @@ export const sendMessage = async (req: Request, res: Response) => {
     const filtered_message=customFilter.clean(content)
     const token = extractBearerToken(req.headers.authorization);
     const {userId} = decodeToken(token);
-    console.log("sendMessage function called",userId)
     const username = (req as any).user?.username || "Unknown";
-    const messageId = await chatService.sendMessage(
+    const messageId = await sendMessageService(
       conversation_id,
       userId,
       filtered_message,
@@ -78,7 +78,7 @@ export const sendMessage = async (req: Request, res: Response) => {
     };
 
     // 3. Emit to online recipients (non-blocking)
-    socketService.emitNewMessage(conversation_id, userId, messagePayload);
+    emitNewMessage(conversation_id, userId, messagePayload);
 
     res.status(200).json({
       status: 0,
@@ -86,7 +86,7 @@ export const sendMessage = async (req: Request, res: Response) => {
       data: { message_id: messageId },
     });
   } catch (error: any) {
-    console.error("Error sending message:", error);
+    logger.error("Error sending message", { error });
     res.status(500).json({
       status: 1,
       message: error.message || "Failed to send message",
@@ -104,7 +104,7 @@ export const markConversationRead = async (req: Request, res: Response) => {
     const {userId} = decodeToken(token);
 
 
-    await chatService.markConversationRead(
+    await markConversationReadService(
       conversation_id,
       userId,
       last_message_id,
@@ -115,7 +115,7 @@ export const markConversationRead = async (req: Request, res: Response) => {
       message: "Conversation marked as read",
     });
   } catch (error: any) {
-    console.error("Error marking conversation read:", error);
+    logger.error("Error marking conversation read", { error });
     res.status(500).json({
       status: 1,
       message: error.message || "Failed to mark conversation as read",
@@ -131,7 +131,7 @@ export const getUserInbox = async (req: Request, res: Response) => {
     const token = extractBearerToken(req.headers.authorization);
     const {userId} = decodeToken(token);
 
-    const inbox = await chatService.getUserInbox(userId);
+    const inbox = await getUserInboxService(userId);
 
     res.status(200).json({
       status: 0,
@@ -139,7 +139,7 @@ export const getUserInbox = async (req: Request, res: Response) => {
       data: inbox,
     });
   } catch (error: any) {
-    console.error("Error getting inbox:", error);
+    logger.error("Error getting inbox", { error });
     res.status(500).json({
       status: 1,
       message: error.message || "Failed to get inbox",
@@ -155,7 +155,7 @@ export const getConversationMessages = async (req: Request, res: Response) => {
     const conversationId = req.params.id as string;
     const { limit, offset } = req.query as GetMessagesQuery;
 
-    const messages = await chatService.getConversationMessages(
+    const messages = await getConversationMessagesService(
       conversationId,
       limit ? parseInt(limit.toString()) : 50,
       offset ? parseInt(offset.toString()) : 0,
@@ -167,7 +167,7 @@ export const getConversationMessages = async (req: Request, res: Response) => {
       data: messages,
     });
   } catch (error: any) {
-    console.error("Error getting messages:", error);
+    logger.error("Error getting messages", { error });
     res.status(500).json({
       status: 1,
       message: error.message || "Failed to get messages",

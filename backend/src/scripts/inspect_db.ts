@@ -1,5 +1,6 @@
 
 import { pool } from "../config/db.js";
+import { logger } from "../utils/logger.js";
 
 const inspect = async () => {
   try {
@@ -11,9 +12,9 @@ const inspect = async () => {
         AND table_name = ANY($1)
       ORDER BY table_name, ordinal_position
     `, [tables]);
-    console.log(JSON.stringify(res.rows, null, 2));
+    logger.info(JSON.stringify(res.rows, null, 2));
   } catch (err) {
-    console.error(err);
+    logger.error('Database inspection failed', { error: err });
   } finally {
     pool.end();
   }

@@ -2,7 +2,6 @@ import express, { type Application } from "express";
 import cors from "cors";
 import authRoutes from "./routes/auth.routes.js";
 import conversationRoutes from "./routes/conversation.routes.js";
-import blockRoutes from "./routes/block.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import { errorLogs } from "./middlewares/errorLogs.middleware.js";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
@@ -29,7 +28,6 @@ app.use("/uploads", express.static("public/uploads"));
 
 app.use("/api", authRoutes);
 app.use("/api/conversation", authMiddleware, conversationRoutes);
-app.use("/api/block", authMiddleware, blockRoutes);
 app.use("/api/user", authMiddleware, userRoutes);
 app.use(errorLogs);
 app.use(errorMiddleware);

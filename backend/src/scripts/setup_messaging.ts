@@ -2,6 +2,7 @@
 import { pool } from "../config/db.js";
 import fs from "fs";
 import path from "path";
+import { logger } from "../utils/logger.js";
 
 const applySql = async () => {
   try {
@@ -11,13 +12,13 @@ const applySql = async () => {
     for (const file of files) {
         const sqlPath = path.join(dirPath, file);
         const sql = fs.readFileSync(sqlPath, "utf-8");
-        console.log(`Applying SQL from: ${file}`);
+        logger.info(`Applying SQL from: ${file}`);
         await pool.query(sql);
     }
     
-    console.log("Successfully applied all messaging schema and functions.");
+    logger.info("Successfully applied all messaging schema and functions.");
   } catch (err) {
-    console.error("Error applying SQL:", err);
+    logger.error("Error applying SQL:", { error: err });
   } finally {
     pool.end();
   }

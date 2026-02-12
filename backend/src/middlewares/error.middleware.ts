@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { AppError } from "../utils/response/appError.js";
 import { RESPONSE_CODES } from "../constants/responseCode.constant.js";
+import { logger } from "../utils/logger.js";
 
 export const errorMiddleware = (
   err: any,
@@ -13,7 +14,7 @@ export const errorMiddleware = (
   if (err instanceof AppError) {
     error = err;
   } else {
-    console.log(err);
+    logger.error("Unhandled error", { error: err });
     error = new AppError(500, "Internal Server Error", {
       success: false,
       code: RESPONSE_CODES.INTERNAL_SERVER_ERROR

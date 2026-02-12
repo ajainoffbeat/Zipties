@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { pool } from '../config/db.js';
 import '../config/env.js';
+import { logger } from '../utils/logger.js';
 
 // Create a unified table to track both functions and tables
 const CREATE_MIGRATION_TRACKING_TABLE = `
@@ -49,7 +50,6 @@ async function extractFunctionsFromSQL(content: string, filename: string): Promi
           name: functionName,
           sql: fullFunctionSQL
         });
-        console.log(`🔍 Found function "${functionName}"`);
       }
     }
   }
@@ -58,7 +58,7 @@ async function extractFunctionsFromSQL(content: string, filename: string): Promi
 }
 
 async function executeFunction(functionName: string, sql: string, sourceFile: string): Promise<void> {
-  console.log(`🔄 Executing function: ${functionName}`);
+  logger.info(`🔄 Executing function: ${functionName}`);
   
   try {
     await pool.query('BEGIN');
@@ -73,10 +73,10 @@ async function executeFunction(functionName: string, sql: string, sourceFile: st
     );
     
     await pool.query('COMMIT');
-    console.log(`✅ Successfully executed: ${functionName}`);
+    logger.info(`✅ Successfully executed: ${functionName}`);
   } catch (error) {
     await pool.query('ROLLBACK');
-    console.error(`❌ Failed to execute ${functionName}:`, error);
+    logger.error(`❌ Failed to execute ${functionName}`, { error });
     throw error;
   }
 }
@@ -91,20 +91,20 @@ async function getExecutedFunctions(): Promise<Set<string>> {
 }
 
 async function runFunctionMigrations(): Promise<void> {
-  console.log('🚀 Starting function-level migrations...');
+  logger.info('🚀 Starting function-level migrations...');
   
   try {
     // Test database connection first
-    console.log('🔌 Testing database connection...');
+    logger.info('🔌 Testing database connection...');
     await pool.query('SELECT NOW()');
-    console.log('✅ Database connection successful');
+    logger.info('✅ Database connection successful');
     
     // Ensure migration tracking table exists
     await ensureMigrationTrackingTable();
     
     // Get already executed functions
     const executedFunctions = await getExecutedFunctions();
-    console.log(`📋 Found ${executedFunctions.size} previously executed functions`);
+    logger.info(`📋 Found ${executedFunctions.size} previously executed functions`);
     
     // Migration files to process
     const migrationFiles = [
@@ -117,17 +117,16 @@ async function runFunctionMigrations(): Promise<void> {
     const migrationDir = path.join(process.cwd(), '..', 'migration-script');
     
     for (const filename of migrationFiles) {
-      console.log(`📄 Processing file: ${filename}`);
+      logger.info(`📄 Processing file: ${filename}`);
       
       const filePath = path.join(migrationDir, filename);
       const content = fs.readFileSync(filePath, 'utf8');
       
       // Extract functions from the file
       const functions = await extractFunctionsFromSQL(content, filename);
-      console.log(filename,functions)
       
       if (functions.length === 0) {
-        console.log(`ℹ️  No functions found in ${filename}, executing as table migration`);
+        logger.info(`ℹ️  No functions found in ${filename}, executing as table migration`);
         
         // If no functions (like Create_tables.sql), execute the whole file if not already done
         if (filename === 'Create_tables.sql' || filename === 'Functions.sql') {
@@ -138,25 +137,25 @@ async function runFunctionMigrations(): Promise<void> {
               await pool.query(content);
               await pool.query('INSERT INTO sql_migrations (filename) VALUES ($1)', [filename]);
               await pool.query('COMMIT');
-              console.log(`✅ Executed table migration: ${filename}`);
+              logger.info(`✅ Executed table migration: ${filename}`);
             } else {
-              console.log(`⏭️  Skipping already executed: ${filename}`);
+              logger.info(`⏭️  Skipping already executed: ${filename}`);
             }
           } catch (error: any) {
             // Table doesn't exist or already exists, handle gracefully
             if (error.code === '42P07') {
-              console.log(`⚠️  Tables already exist, checking if tracked...`);
+              logger.info(`⚠️  Tables already exist, checking if tracked...`);
               
               try {
                 const migrationResult = await pool.query('SELECT filename FROM sql_migrations WHERE filename = $1', [filename]);
                 if (migrationResult.rows.length === 0) {
                   await pool.query('INSERT INTO sql_migrations (filename) VALUES ($1)', [filename]);
-                  console.log(`✅ Added existing file to tracking: ${filename}`);
+                  logger.info(`✅ Added existing file to tracking: ${filename}`);
                 } else {
-                  console.log(`⏭️  File already tracked: ${filename}`);
+                  logger.info(`⏭️  File already tracked: ${filename}`);
                 }
               } catch (trackingError) {
-                console.error(`❌ Failed to track existing file ${filename}:`, trackingError);
+                logger.error(`❌ Failed to track existing file ${filename}`, { error: trackingError });
               }
             } else {
               // Table doesn't exist, so execute the file
@@ -164,7 +163,7 @@ async function runFunctionMigrations(): Promise<void> {
               await pool.query(content);
               await pool.query('INSERT INTO sql_migrations (filename) VALUES ($1)', [filename]);
               await pool.query('COMMIT');
-              console.log(`✅ Executed table migration (first time): ${filename}`);
+              logger.info(`✅ Executed table migration (first time): ${filename}`);
             }
           }
         }
@@ -176,15 +175,15 @@ async function runFunctionMigrations(): Promise<void> {
         if (!executedFunctions.has(func.name)) {
           await executeFunction(func.name, func.sql, filename);
         } else {
-          console.log(`⏭️  Skipping already executed function: ${func.name}`);
+          logger.info(`⏭️  Skipping already executed function: ${func.name}`);
         }
       }
     }
     
-    console.log('🎉 All function migrations completed successfully!');
+    logger.info('🎉 All function migrations completed successfully!');
     
   } catch (error) {
-    console.error('💥 Migration failed:', error);
+    logger.error('💥 Migration failed', { error });
     process.exit(1);
   } finally {
     await pool.end();

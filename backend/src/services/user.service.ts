@@ -1,22 +1,35 @@
-
+import type { BlockUserResponse } from "../@types/block.types.js";
+import type { 
+  UserProfileData, 
+  UserProfile, 
+  City, 
+  UserSearchResult 
+} from "../@types/user.types.js";
+import { AppError } from "../utils/response/appError.js";
+import { RESPONSE_CODES } from "../constants/responseCode.constant.js";
+import { logger } from "../utils/logger.js";
 import { pool } from "../config/db.js";
 
 export const userProfile = async (
   currentUserId: string,
   userId: string
-): Promise<any> => {
-  const result = await pool.query(
-    `SELECT * FROM fn_get_user_profile($1,$2)`,
-    [currentUserId,userId]
-  );
-  console.log(result.rows[0]);
-  return result.rows[0]
+): Promise<UserProfile | null> => {
+  
+  try {
+    const result = await pool.query(
+      `SELECT * FROM fn_get_user_profile($1, $2)`,
+      [currentUserId, userId]
+    );
+    return result.rows[0] || null;
+  } catch (error) {
+    logger.error('Failed to fetch user profile', { currentUserId, userId, error }, currentUserId);
+    throw error;
+  }
 }
-
 
 export const updateUserProfile = async (
   userId: string,
-  profileData: any
+  profileData: UserProfileData
 ): Promise<boolean> => {
   try {
     console.log(profileData);
@@ -37,9 +50,11 @@ export const updateUserProfile = async (
         profileData.tags || null,
       ]
     );
+    
+    logger.info('User profile updated successfully', { userId }, userId);
     return result.rows[0]?.success === true;
   } catch (err) {
-    console.error("Error updating user profile:", err);
+    logger.error('Error updating user profile', { userId, profileData, error: err }, userId);
     return false;
   }
 };
@@ -50,7 +65,7 @@ export const getUsCities = async (
   state?: string,
   limit = 50,
   offset = 0
-): Promise<any[]> => {
+): Promise<City[]> => {
   try {
     console.log(countryCode, state, search, limit, offset)
     const result = await pool.query(
@@ -63,21 +78,160 @@ export const getUsCities = async (
         offset
       ]
     );
-
-    return result.rows;
+    
+    logger.debug('Cities fetched successfully', { countryCode, search, state, limit, offset, count: result.rows.length });
+    return result.rows || [];
   } catch (err) {
-    console.error("Error fetching cities:", err);
+    logger.error('Error fetching cities', { countryCode, search, state, limit, offset, error: err });
     throw err;
   }
 };
 
-export const searchUsersByName = async (query: string, currentUserId: string): Promise<any[]> => {
-  const result = await pool.query(
+export const searchUsersByName = async (query: string, currentUserId: string): Promise<UserSearchResult[]> => {
+  
+  if (!query || query.trim().length < 2) {
+    return [];
+  }
+  
+  try {
+      const result = await pool.query(
     `SELECT * FROM fn_search_users_by_name($1, $2)`,
     [query, currentUserId]
   );
-
-  return result.rows;
+    
+    logger.debug('User search completed', { query, currentUserId, count: result.rows.length }, currentUserId);
+      return result.rows || [];
+  } catch (error) {
+    logger.error('Error searching users by name', { query, currentUserId, error }, currentUserId);
+    throw error;
+  }
 };
 
+/**
+ * Block or unblock a user by calling the appropriate stored procedure
+ * @param userBlocked - UUID of the user being blocked/unblocked
+ * @param userBlocking - UUID of the user performing the action
+ * @param isBlocking - true to block, false to unblock
+ * @param comment - Optional comment for blocking (only used when isBlocking is true)
+ * @returns Block relationship data
+ * @throws Error if validation fails or database error occurs
+ */
+export const blockUser = async (
+  userBlocked: string,
+  userBlocking: string,
+  isBlocking: boolean = true,
+  comment?: string
+): Promise<BlockUserResponse> => {
+  // Validate inputs
+  if (!userBlocked || !userBlocking) {
+    throw new AppError(400, "Both user IDs are required", {
+      code: RESPONSE_CODES.BAD_REQUEST,
+      success: false,
+    });
+  }
 
+  if (userBlocked === userBlocking) {
+    throw new AppError(400, "Users cannot block themselves", {
+      code: RESPONSE_CODES.BAD_REQUEST,
+      success: false,
+    });
+  }
+
+  try {
+    logger.info("isBlocking", isBlocking);
+    // Choose the appropriate stored procedure based on isBlocking parameter
+    if (isBlocking) {
+      // Block operation: fn_block_user(p_user_id, p_blocked_user_id, p_comment)
+      const result = await pool.query(
+        'SELECT * FROM fn_block_user($1, $2, $3)',
+        [userBlocking, userBlocked, comment || null]
+      );
+
+      // Check if the operation was successful
+      if (!result.rows[0]?.success) {
+        const message = result.rows[0]?.message || 'Block operation failed';
+
+        // Handle specific error cases
+        if (message.includes('already blocked')) {
+          throw new AppError(409, message, {
+            code: RESPONSE_CODES.USER_ALREADY_EXISTS,
+            success: false,
+          });
+        }
+
+        if (message.includes('do not exist') || message.includes('required')) {
+          throw new AppError(400, message, {
+            code: RESPONSE_CODES.BAD_REQUEST,
+            success: false,
+          });
+        }
+
+        // General operation failure
+        throw new AppError(400, message, {
+          code: RESPONSE_CODES.BAD_REQUEST,
+          success: false,
+        });
+      }
+
+      // For block operations, return the block relationship data
+      return {
+        block_id: result.rows[0]?.block_id || null,
+        blocked_at: result.rows[0]?.blocked_at || new Date().toISOString(),
+      };
+    } else {
+      // Unblock operation: fn_unblock_user(p_user_id, p_blocked_user_id)
+      const result = await pool.query(
+        'SELECT * FROM fn_unblock_user($1, $2)',
+        [userBlocking, userBlocked]
+      );
+
+      // Check if the operation was successful
+      if (!result.rows[0]?.success) {
+        const message = result.rows[0]?.message || 'Unblock operation failed';
+
+        // Handle specific error cases
+        if (message.includes('not found')) {
+          throw new AppError(404, message, {
+            code: RESPONSE_CODES.USER_NOT_FOUND,
+            success: false,
+          });
+        }
+
+        if (message.includes('required') || message.includes('Invalid operation')) {
+          throw new AppError(400, message, {
+            code: RESPONSE_CODES.BAD_REQUEST,
+            success: false,
+          });
+        }
+
+        // General operation failure
+        throw new AppError(400, message, {
+          code: RESPONSE_CODES.BAD_REQUEST,
+          success: false,
+        });
+      }
+
+      // For unblock operations, we don't have block_id/blocked_at, so return appropriate response
+      return {
+        block_id: null,
+        blocked_at: new Date().toISOString(),
+      };
+    }
+  } catch (error: any) {
+    // If it's already an AppError, re-throw it
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    // Handle database connection errors
+    if (error.code === 'ECONNREFUSED' || error.code === '3D000') {
+      throw new AppError(503, "Database service unavailable", {
+        code: RESPONSE_CODES.INTERNAL_SERVER_ERROR,
+        success: false,
+      });
+    }
+
+    // Re-throw the error for the controller to handle
+    throw error;
+  }
+};

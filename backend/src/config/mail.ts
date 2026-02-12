@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
-import { env } from "./env.js"; 
+import { env } from "./env.js";
+import { logger } from "../utils/logger.js"; 
 
 export const mailer = nodemailer.createTransport({
   service: "gmail",
@@ -15,8 +16,8 @@ export const mailer = nodemailer.createTransport({
 export const verifyMailConnection = async () => {
   try {
     await mailer.verify();
-    console.log("Mail server is ready");
+    logger.info("Mail server is ready");
   } catch (error) {
-    console.error("Mail server connection failed", error);
+    logger.error("Mail server connection failed", { error });
   }
 };

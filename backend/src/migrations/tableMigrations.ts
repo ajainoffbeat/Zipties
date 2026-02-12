@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { pool } from '../config/db.js';
 import '../config/env.js';
+import { logger } from '../utils/logger.js';
 
 // Create a unified table to track both functions and tables
 const CREATE_MIGRATION_TRACKING_TABLE = `
@@ -52,7 +53,7 @@ async function extractTablesFromSQL(content: string, filename: string): Promise<
 }
 
 async function executeTable(tableName: string, sql: string, sourceFile: string): Promise<void> {
-  console.log(`🔄 Executing table: ${tableName}`);
+  logger.info(`🔄 Executing table: ${tableName}`);
   
   try {
     await pool.query('BEGIN');
@@ -67,13 +68,13 @@ async function executeTable(tableName: string, sql: string, sourceFile: string):
     );
     
     await pool.query('COMMIT');
-    console.log(`✅ Successfully executed: ${tableName}`);
+    logger.info(`✅ Successfully executed: ${tableName}`);
   } catch (error: any) {
     await pool.query('ROLLBACK');
     
     // If table already exists, check if it's tracked
     if (error.code === '42P07') {
-      console.log(`⚠️  Table ${tableName} already exists, checking if tracked...`);
+      logger.info(`⚠️  Table ${tableName} already exists, checking if tracked...`);
       
       try {
         const trackingResult = await pool.query(
@@ -87,16 +88,16 @@ async function executeTable(tableName: string, sql: string, sourceFile: string):
             'INSERT INTO migrations (object_name, object_type, source_file) VALUES ($1, $2, $3)',
             [tableName, 'table', sourceFile]
           );
-          console.log(`✅ Added existing table to tracking: ${tableName}`);
+          logger.info(`✅ Added existing table to tracking: ${tableName}`);
         } else {
-          console.log(`⏭️  Table already tracked: ${tableName}`);
+          logger.info(`⏭️  Table already tracked: ${tableName}`);
         }
       } catch (trackingError) {
-        console.error(`❌ Failed to track existing table ${tableName}:`, trackingError);
+        logger.error(`❌ Failed to track existing table ${tableName}`, { error: trackingError });
         throw trackingError;
       }
     } else {
-      console.error(`❌ Failed to execute ${tableName}:`, error);
+      logger.error(`❌ Failed to execute ${tableName}`, { error });
       throw error;
     }
   }
@@ -112,20 +113,20 @@ async function getExecutedTables(): Promise<Set<string>> {
 }
 
 async function runTableMigrations(): Promise<void> {
-  console.log('🚀 Starting table-level migrations...');
+  logger.info('🚀 Starting table-level migrations...');
   
   try {
     // Test database connection first
-    console.log('🔌 Testing database connection...');
+    logger.info('🔌 Testing database connection...');
     await pool.query('SELECT NOW()');
-    console.log('✅ Database connection successful');
+    logger.info('✅ Database connection successful');
     
     // Ensure migration tracking table exists
     await ensureMigrationTrackingTable();
     
     // Get already executed tables
     const executedTables = await getExecutedTables();
-    console.log(`📋 Found ${executedTables.size} previously executed tables`);
+    logger.info(`📋 Found ${executedTables.size} previously executed tables`);
     
     // Migration files to process
     const migrationFiles = [
@@ -135,7 +136,7 @@ async function runTableMigrations(): Promise<void> {
     const migrationDir = path.join(process.cwd(), '..', 'migration-script');
     
     for (const filename of migrationFiles) {
-      console.log(`📄 Processing file: ${filename}`);
+      logger.info(`📄 Processing file: ${filename}`);
       
       const filePath = path.join(migrationDir, filename);
       const content = fs.readFileSync(filePath, 'utf8');
@@ -144,8 +145,7 @@ async function runTableMigrations(): Promise<void> {
       const tables = await extractTablesFromSQL(content, filename);
       
       if (tables.length === 0) {
-        console.log(`ℹ️  No tables found in ${filename}`);
-        continue;
+          continue;
       }
       
       // Execute each table that hasn't been executed yet
@@ -153,15 +153,15 @@ async function runTableMigrations(): Promise<void> {
         if (!executedTables.has(table.name)) {
           await executeTable(table.name, table.sql, filename);
         } else {
-          console.log(`⏭️  Skipping already executed table: ${table.name}`);
+          logger.info(`⏭️  Skipping already executed table: ${table.name}`);
         }
       }
     }
     
-    console.log('🎉 All table migrations completed successfully!');
+    logger.info('🎉 All table migrations completed successfully!');
     
   } catch (error) {
-    console.error('💥 Migration failed:', error);
+    logger.error('💥 Migration failed', { error });
     process.exit(1);
   } finally {
     await pool.end();
