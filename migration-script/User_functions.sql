@@ -22,45 +22,54 @@ $$;
 -- Author        : OFFBEAT
 -- Created On    : 29/01/2025
 -- ============================================================================
-CREATE OR REPLACE FUNCTION public.fn_get_user_profile(p_current_user_id uuid,p_user_id uuid) RETURNS TABLE(
-        id uuid,
-        first_name text,
-        last_name text,
-        username text,
-        email text,
-        bio text,
-        city_id uuid,
-        city_name text,
-        interests text,
-        tags text,
-        profile_image_url text,
-        joined_date timestamp without time zone,
-        isblocked boolean
-    ) LANGUAGE 'plpgsql' COST 100 STABLE PARALLEL UNSAFE ROWS 1000 AS $$ BEGIN RETURN QUERY
-SELECT u.id,
-    u.firstname::text AS first_name,
-    u.lastname::text AS last_name,
-    u.username::text,
-    u.email::text,
-    u.bio::text,
+CREATE OR REPLACE FUNCTION public.fn_get_user_profile(
+    p_current_user_id uuid,
+    p_user_id uuid
+)
+RETURNS TABLE(
+    id uuid,
+    first_name text,
+    last_name text,
+    username text,
+    email text,
+    bio text,
+    city_id uuid,
+    city_name text,
+    interests text,
+    tags text,
+    profile_image_url text,
+    joined_date timestamp without time zone,
+    isblocked boolean
+)
+LANGUAGE sql
+STABLE
+AS
+$$
+SELECT 
+    u.id,
+    u.firstname AS first_name,
+    u.lastname AS last_name,
+    u.username,
+    u.email,
+    u.bio,
     u.city_id,
-    c.name::text AS city_name,
+    c.name AS city_name,
     u.interests,
     u.tags,
-    u.profile_image_url::text,
-    u.created_at,
-    CASE WHEN EXISTS (
-        SELECT 1 
-        FROM user_report ur 
-        WHERE ur.blocked_user_id = u.id AND ur.user_id = p_current_user_id
-    ) THEN true ELSE false END AS isblocked
+    u.profile_image_url,
+    u.created_at AS joined_date,
+    (ur.blocked_user_id IS NOT NULL) AS isblocked
 FROM "user" u
-    LEFT JOIN city c ON c.id = u.city_id
+LEFT JOIN city c 
+    ON c.id = u.city_id
+LEFT JOIN user_report ur 
+    ON ur.blocked_user_id = u.id 
+    AND ur.user_id = p_current_user_id
 WHERE u.id = p_user_id
     AND u.is_blocked = false
     AND u.is_active = true;
-END;
 $$;
+
 -- ============================================================================
 -- Function Name : fn_update_user
 -- Purpose       : Updates a user's profile information.
@@ -239,6 +248,29 @@ ORDER BY c.city
 LIMIT p_limit OFFSET p_offset;
 END;
 $BODY$;
+
+-- ============================================================================
+-- Function Name : fn_is_user_blocked
+-- Purpose       : Checks if a user has blocked another user.
+-- Author        : OFFBEAT
+-- Created On    : 11/02/2025
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.fn_is_user_blocked(
+    p_user_id uuid,
+    p_current_user_id uuid
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+AS $$
+    SELECT EXISTS (
+        SELECT 1
+        FROM user_report ur
+        WHERE ur.user_id = p_user_id
+          AND ur.blocked_user_id = p_current_user_id
+    );
+$$;
+
 -- ============================================================================
 -- Function Name : fn_search_users_by_name
 -- Purpose       : Searches for users by first name, last name, or username.
@@ -247,33 +279,33 @@ $BODY$;
 -- Created On    : 11/02/2025
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.fn_search_users_by_name(
-        p_query character varying,
-        p_current_user_id uuid
-    ) RETURNS TABLE(
-        id uuid,
-        first_name text,
-        last_name text,
-        username character varying,
-        profile_image_url character varying
-    ) LANGUAGE 'plpgsql' COST 100 VOLATILE PARALLEL UNSAFE ROWS 1000 AS $BODY$ BEGIN RETURN QUERY
-SELECT u.id,
-    u.firstname::text AS first_name,
-    u.lastname::text AS last_name,
-    u.username,
-    u.profile_image_url
-FROM "user" u
-WHERE (
-        u.firstname ILIKE '%' || p_query || '%'
-        OR u.lastname ILIKE '%' || p_query || '%'
-        OR u.username ILIKE '%' || p_query || '%'
-    )
-    AND u.id != p_current_user_id
-    AND NOT EXISTS (
-        SELECT 1
-        FROM user_report ur
-        WHERE ur.user_id = u.id
-            AND ur.blocked_user_id = p_current_user_id
-    )
-LIMIT 10;
+    p_query character varying,
+    p_current_user_id uuid
+)
+RETURNS TABLE(
+    id uuid,
+    first_name text,
+    last_name text,
+    username character varying,
+    profile_image_url character varying
+)
+LANGUAGE plpgsql
+AS $BODY$
+BEGIN
+    RETURN QUERY
+    SELECT u.id,
+        u.firstname::text AS first_name,
+        u.lastname::text AS last_name,
+        u.username,
+        u.profile_image_url
+    FROM "user" u
+    WHERE (
+            u.firstname ILIKE '%' || p_query || '%'
+            OR u.lastname ILIKE '%' || p_query || '%'
+            OR u.username ILIKE '%' || p_query || '%'
+        )
+        AND u.id != p_current_user_id
+        AND NOT public.fn_is_user_blocked(u.id, p_current_user_id)
+    LIMIT 10;
 END;
 $BODY$;
