@@ -1,7 +1,7 @@
 import type { Response, Request, NextFunction } from "express";
 import { decodeToken, extractBearerToken } from "../utils/jwt.util.js";
 import { getUsCities, updateUserProfile, userProfile, searchUsersByName, blockUser as blockUserService } from "../services/user.service.js";
-import { uploadToS3 } from "../services/s3.service.js";
+import { deleteFromS3, uploadToS3 } from "../services/s3.service.js";
 import { AppError } from "../utils/response/appError.js";
 import { sendSuccess } from "../utils/response/appSuccess.js";
 import { RESPONSE_CODES } from "../constants/responseCode.constant.js";
@@ -119,6 +119,11 @@ export const uploadAvatar = async (
     const fileUrl = await uploadToS3((req as any).file);
     const token = extractBearerToken(req.headers.authorization);
     const { userId } = decodeToken(token);
+
+    const user = await userProfile(userId, userId);
+    if (user?.profile_image_url) {
+      await deleteFromS3(user.profile_image_url);
+    }
     const isUpdated = await updateUserProfile(userId, { profile_image_url: fileUrl });
     if (!isUpdated) {
       throw new AppError(400, "Failed to update profile", {
