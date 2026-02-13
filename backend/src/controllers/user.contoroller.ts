@@ -7,28 +7,6 @@ import { sendSuccess } from "../utils/response/appSuccess.js";
 import { RESPONSE_CODES } from "../constants/responseCode.constant.js";
 import type { BlockUserRequest } from "../@types/block.types.js";
 
-export const getProfile = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const token = extractBearerToken(req.headers.authorization);
-    const { userId } = decodeToken(token);
-    const rows = await userProfile(userId,userId);
-    if (!rows) {
-      return res.status(404).json({ message: "Profile not found" });
-    }
-
-    res.json({
-      success: true,
-      data: rows,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
 export const editProfile = async (
   req: Request,
   res: Response,
