@@ -75,7 +75,7 @@ LIMIT 1;
 IF v_log_id IS NULL THEN RETURN FALSE;
 END IF;
 UPDATE user_login_log
-SET logout_dateime = NOW()
+SET logout_datetime = NOW()
 WHERE id = v_log_id;
 RETURN TRUE;
 END;

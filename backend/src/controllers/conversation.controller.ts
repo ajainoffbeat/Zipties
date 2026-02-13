@@ -56,6 +56,13 @@ export const sendMessage = async (req: Request, res: Response) => {
       req.body as SendMessageRequest;
     const customFilter = new Filter({ placeHolder: 'x' })
     const filtered_message=customFilter.clean(content)
+    
+    if (content !== filtered_message) {
+      return res.status(400).json({
+        status: 1,
+        message: "Message contains inappropriate content",
+      });
+    }
     const token = extractBearerToken(req.headers.authorization);
     const {userId} = decodeToken(token);
     const username = (req as any).user?.username || "Unknown";
