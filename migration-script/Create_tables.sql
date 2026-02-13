@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS public."user" (
     firstname VARCHAR(50),
     lastname VARCHAR(50),
 
-    username VARCHAR(50) UNIQUE NOT NULL,
+    username VARCHAR(50) UNIQUE ,
     email VARCHAR(70) UNIQUE NOT NULL,
     password VARCHAR(70) NOT NULL,
 

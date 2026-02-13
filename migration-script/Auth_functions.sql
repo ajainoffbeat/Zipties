@@ -100,7 +100,7 @@ INSERT INTO "user" (
 VALUES (
         v_user_id,
         p_email,
-        p_email,
+        NULL,
         p_password,
         p_firstname,
         p_lastname,
