@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -14,6 +14,8 @@ import {
   Users
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useProfileStore } from "@/store/useProfileStore";
+
 
 const mockPosts = [
   {
@@ -76,7 +78,8 @@ const trendingTopics = [
 export default function Feed() {
   const [posts, setPosts] = useState(mockPosts);
   const [newPost, setNewPost] = useState("");
-
+  const { profile } = useProfileStore();
+  
   const handleLike = (postId: number) => {
     setPosts(posts.map(post => 
       post.id === postId 
@@ -84,10 +87,10 @@ export default function Feed() {
         : post
     ));
   };
-
+  
   return (
     <AppLayout>
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 mb-[18rem]">
         <div className="grid lg:grid-cols-12 gap-8 max-w-6xl mx-auto">
           {/* Main Feed */}
           <div className="lg:col-span-8 space-y-6">
@@ -95,6 +98,7 @@ export default function Feed() {
             <div className="bg-card rounded-2xl border border-border p-5 shadow-sm">
               <div className="flex gap-4">
                 <Avatar className="w-11 h-11">
+                  <AvatarImage src={profile?.profile_image_url} />
                   <AvatarFallback className="bg-primary/10 text-primary font-medium">
                     U
                   </AvatarFallback>

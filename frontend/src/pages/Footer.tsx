@@ -27,7 +27,7 @@ export const Footer = () => {
               <Link
                 key={link.label}
                 to={link.to}
-                className="text-muted-foreground hover:text-foreground transition-colors"
+                className="text-primary hover:text-primary/80 transition-colors hover:underline"
               >
                 {link.label}
               </Link>

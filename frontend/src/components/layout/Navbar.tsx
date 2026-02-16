@@ -9,25 +9,39 @@ import {
   Menu,
   X,
   Sparkles,
-  Search
+  Search,
+  LogOut,
+  ChevronDown
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import Cookies from "js-cookie";
+// import Cookies from "js-cookie";
 import { useNavigate } from "react-router-dom";
 import { removeCookie } from "@/utils/cookies";
 import logo2 from "@/assets/logo.png";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { searchUsers } from "@/lib/api/auth.api";
+// import {
+//   Dialog,
+//   DialogContent,
+//   DialogHeader,
+//   DialogTitle,
+//   DialogTrigger,
+// } from "@/components/ui/dialog";
+// import { Input } from "@/components/ui/input";
+import { searchUsers } from "@/lib/api/user.api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { debounce } from "lodash";
+import { useTotalUnreadCount } from "@/store/useInboxStore";
+// import { Badge } from "@/components/ui/badge";
+import { useProfileStore } from "@/store/useProfileStore";
+import { useAuthStore } from "@/store/authStore";
 
 const navItems = [
   { path: "/feed", label: "Feed", icon: Home },
@@ -44,6 +58,8 @@ export function Navbar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const unreadCount = useTotalUnreadCount();
+  const { profile, fetchProfile } = useProfileStore();
 
   const performSearch = useCallback(
     debounce(async (query: string) => {
@@ -63,6 +79,11 @@ export function Navbar() {
     }, 300),
     []
   );
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
 
   useEffect(() => {
     performSearch(searchQuery);
@@ -86,17 +107,21 @@ export function Navbar() {
           <div className="hidden md:flex items-center gap-1">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path;
+              const isMessages = item.label === "Messages";
               return (
-                <Link key={item.path} to={item.path}>
+                <Link key={item.path} to={item.path || "#"}>
                   <Button
                     variant={isActive ? "secondary" : "ghost"}
                     className={cn(
-                      "gap-2",
+                      "gap-2 relative",
                       isActive && "bg-primary/10 text-primary"
                     )}
                   >
                     <item.icon className="w-4 h-4" />
                     {item.label}
+                    {isMessages && unreadCount > 0 && (
+                      <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-background shadow-sm animate-pulse" />
+                    )}
                   </Button>
                 </Link>
               );
@@ -160,7 +185,7 @@ export function Navbar() {
                           onClick={() => handleUserClick(user.id)}
                         >
                           <Avatar className="w-10 h-10 border border-border">
-                            <AvatarImage src={`http://localhost:5000${user.profile_image_url}`} />
+                            <AvatarImage src={`${user.profile_image_url}`} />
                             <AvatarFallback className="bg-primary/5 text-primary">
                               {user.first_name?.[0]}{user.last_name?.[0]}
                             </AvatarFallback>
@@ -183,17 +208,44 @@ export function Navbar() {
               )}
             </div>
 
-            <Link to="/profile">
-              <Button variant="ghost" size="icon" className="rounded-full">
-                <User className="w-5 h-5" />
-              </Button>
-            </Link>
-            <Button variant="hero" size="sm" onClick={() => {
-              removeCookie("token");
-              navigate("/");
-            }}>
-              Log Out
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 overflow-hidden ring-offset-background transition-all hover:ring-2 hover:ring-primary/20">
+                  <Avatar className="h-10 w-10 border border-border">
+                    <AvatarImage src={profile?.profile_image_url} />
+                    <AvatarFallback className="bg-primary/5 text-primary font-medium">
+                      {(profile?.first_name?.[0] || "") + (profile?.last_name?.[0] || "") || <User className="h-5 w-5" />}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{profile?.first_name} {profile?.last_name}</p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {profile?.username}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/profile")} className="cursor-pointer ">
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-white cursor-pointer"
+                  onClick={() => {
+                    removeCookie("token");
+                    navigate("/");
+                  }}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Mobile Menu Button */}
@@ -213,37 +265,67 @@ export function Navbar() {
             <div className="flex flex-col gap-2">
               {navItems.map((item) => {
                 const isActive = location.pathname === item.path;
+                const isMessages = item.label === "Messages";
                 return (
                   <Link
                     key={item.path}
-                    to={item.path}
+                    to={item.path || "#"}
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <Button
                       variant={isActive ? "secondary" : "ghost"}
                       className={cn(
-                        "w-full justify-start gap-3",
+                        "w-full justify-start gap-3 relative",
                         isActive && "bg-primary/10 text-primary"
                       )}
                     >
                       <item.icon className="w-5 h-5" />
                       {item.label}
+                      {isMessages && unreadCount > 0 && (
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-sm" />
+                      )}
                     </Button>
                   </Link>
                 );
               })}
               <div className="flex gap-2 mt-4 pt-4 border-t border-border">
-                <Link to="/profile" className="flex-1">
-                  {/* <Button variant="outline" className="w-full gap-2">
-                    <User className="w-4 h-4" />
-                    Profile
-                  </Button> */}
-                </Link>
-                <Link to="/" className="flex-1">
-                  <Button variant="hero" className="w-full">
-                    Get Started
-                  </Button>
-                </Link>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="secondary" className="w-full justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6 border border-border">
+                          <AvatarImage src={profile?.profile_image_url} />
+                          <AvatarFallback className="text-[10px]">
+                            {profile?.first_name?.[0]}{profile?.last_name?.[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span>Account</span>
+                      </div>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-[calc(100vw-2.5rem)]" align="start">
+                    <DropdownMenuItem onClick={() => {
+                      setMobileMenuOpen(false);
+                      navigate("/profile");
+                    }}>
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        removeCookie("token");
+                        navigate("/");
+                      }}
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Log out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </div>

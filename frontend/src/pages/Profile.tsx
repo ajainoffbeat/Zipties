@@ -2,28 +2,20 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Settings,
   Edit2,
   MapPin,
   Calendar,
-  Link as LinkIcon,
-  Users,
-  FileText,
-  ShoppingBag,
-  Heart,
   MessageCircle,
-  MoreHorizontal
+
 } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
-
-
+import { blockUser } from "@/lib/api/user.api";
 import { useParams } from "react-router-dom";
-import { createConversation } from "@/lib/api/chat.api";
+import { createConversation } from "@/lib/api/messages.api";
 import { useToast } from "@/components/ui/use-toast";
 
 import { Ban } from "lucide-react";
@@ -37,11 +29,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { blockUser } from "@/lib/api/block.api";
 
 export default function Profile() {
   const { userId } = useParams();
-  const { profile, publicProfile, fetchProfile, fetchProfileByUsername, loading } = useProfileStore();
+  const { profile, publicProfile, fetchProfileById, loading } = useProfileStore();
   const navigate = useNavigate();
   const loggedInUserId = useAuthStore((s) => s.userId);
   const { toast } = useToast();
@@ -50,11 +41,9 @@ export default function Profile() {
 
   useEffect(() => {
     if (userId) {
-      fetchProfileByUsername(userId);
-    } else if (loggedInUserId) {
-      fetchProfile(loggedInUserId);
+      fetchProfileById(userId);
     }
-  }, [userId, loggedInUserId]);
+  }, [userId]);
 
   const displayProfile = userId ? publicProfile : profile;
   const isOwnProfile = !userId || (displayProfile?.id === loggedInUserId);
@@ -79,14 +68,16 @@ export default function Profile() {
     }
   };
 
-  const handleBlockUser = async () => {
+  const handleBlockUser = async (isBlocked: boolean) => {
     if (!displayProfile?.id) return;
     setIsBlocking(true);
     try {
-      await blockUser(displayProfile.id, true);
+      await blockUser({ user_blocked: displayProfile.id, is_blocking: isBlocked });
       toast({
-        title: "User Blocked",
-        description: `${displayProfile.first_name} has been blocked.`,
+        title: isBlocked ? "User Blocked" : "User Unblocked",
+        description: isBlocked
+          ? `${displayProfile.first_name} has been blocked.`
+          : `${displayProfile.first_name} has been unblocked.`,
       });
       setBlockDialogOpen(false);
       navigate("/feed"); // Navigate away after blocking
@@ -100,41 +91,19 @@ export default function Profile() {
       setIsBlocking(false);
     }
   };
+  
 
-  if (loading) {
-    return (
-      <AppLayout>
-        <div className="flex items-center justify-center h-[60vh]">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-primary" />
-        </div>
-      </AppLayout>
-    );
-  }
-
-  if (userId && !publicProfile && !loading) {
-    return (
-      <AppLayout>
-        <div className="text-center py-20">
-          <h2 className="text-2xl font-bold">User Not Found</h2>
-          <p className="text-muted-foreground mb-6">This user might have blocked you or their account is private.</p>
-          <Button variant="link" onClick={() => navigate("/feed")}>Go to Feed</Button>
-        </div>
-      </AppLayout>
-    );
-  }
-
-  console.log("displayProfile", displayProfile);
   return (
     <AppLayout>
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 mb-60">
         <div className="max-w-4xl mx-auto">
           {/* Profile Header */}
           <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-sm mb-6 p-6 md:p-8">
             <div className="flex flex-col md:flex-row gap-6 md:items-start">
               {/* Avatar section */}
-              <Avatar className="w-24 h-24 md:w-32 md:h-32 border-4 border-background shadow-xl">
+              <Avatar className="w-24 h-24 md:w-32 md:h-32 border-4 border-background shadow-xl ">
                 <AvatarImage
-                  src={`http://localhost:5000${displayProfile?.profile_image_url}`}
+                  src={`${displayProfile?.profile_image_url}`}
                   alt="Profile image"
                 />
                 <AvatarFallback className="bg-primary/5 text-primary text-2xl md:text-4xl font-bold">
@@ -150,11 +119,11 @@ export default function Profile() {
                     <h1 className="text-2xl md:text-4xl font-bold text-foreground mb-1">
                       {displayProfile?.first_name} {displayProfile?.last_name}
                     </h1>
-                    <p className="text-muted-foreground">@{displayProfile?.username}</p>
+                    <p className="text-muted-foreground">{displayProfile?.username}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {isOwnProfile ? (
-                      <Button variant="outline" size="sm" className="gap-1 px-4" onClick={handleEditProfile}>
+                      <Button variant="secondary" size="sm" className="gap-1 px-4 bg-primary text-primary-foreground hover:bg-primary/80" onClick={handleEditProfile}>
                         <Edit2 className="w-4 h-4" />
                         Edit Profile
                       </Button>
@@ -164,15 +133,28 @@ export default function Profile() {
                           <MessageCircle className="w-4 h-4" />
                           Message
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-1 px-4 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => setBlockDialogOpen(true)}
-                        >
-                          <Ban className="w-4 h-4" />
-                          Block
-                        </Button>
+                        {displayProfile?.isblocked ? (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="gap-1 px-4 text-gray-500 hover:text-gray-500 hover:bg-gray-500/10"
+                              onClick={() => handleBlockUser(false)}
+                            >
+                              <Ban className="w-4 h-4" />
+                              Unblock
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1 px-4 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => setBlockDialogOpen(true)}
+                            >
+                              <Ban className="w-4 h-4" />
+                              Block
+                            </Button>
+                          )
+                        }
                       </>
                     )}
                   </div>
@@ -191,7 +173,7 @@ export default function Profile() {
                       <AlertDialogAction
                         onClick={(e) => {
                           e.preventDefault();
-                          handleBlockUser();
+                          handleBlockUser(true);
                         }}
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         disabled={isBlocking}
@@ -254,7 +236,6 @@ export default function Profile() {
               </div>
             )}
           </div>
-
         </div>
       </div>
     </AppLayout>

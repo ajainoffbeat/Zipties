@@ -20,6 +20,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Messages from "./pages/Messages";
 import { useAuthStore } from "./store/authStore";
 import { useEffect } from "react";
+import AboutUs from "./pages/AboutUs";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +51,7 @@ const App = () => {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+              <Route path="/about-us" element={<AboutUs />} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/feed" element={<Feed />} />

@@ -13,13 +13,13 @@ import {
   EyeOff,
 } from "lucide-react";
 import { authSchema, AuthFormValues } from "@/lib/validators/auth.schema";
-import logo from "@/assets/zeptis-logo-1.png";
 import logo2 from "@/assets/logo.png";
 import { useAuth } from "@/hooks/useAuth";
 import Cookies from "js-cookie";
 import { setCookie } from "@/utils/cookies";
-import { toast, useToast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { Footer } from "./Footer";
+
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -95,13 +95,11 @@ export default function Auth() {
           }
       }
     } catch (err: any) {
-      console.log("Error", err.response?.data.error);
       toast({
         variant: "default",
         title: "Sign Up Failed",
         description: err.response?.data.error || "An error occurred",
       });
-      console.error(err.message);
     }
   };
 
@@ -113,7 +111,7 @@ export default function Auth() {
           <div className="mb-4">
             {
               isLogin && (
-                <img src={logo} className="mb-5" alt="" />
+                  <img src={logo2} className="mb-5" width={35} height={35}/>
               )
             }
             <h1 className="text-3xl font-bold mb-2">
@@ -127,7 +125,7 @@ export default function Auth() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-2">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-2"  noValidate>
 
             {!isLogin && (
               <div className="space-y-1">
@@ -284,7 +282,7 @@ export default function Auth() {
             <button
               type="button"
               onClick={toggleMode}
-              className="text-primary font-medium hover:underline"
+              className="text-primary text-sm hover:underline "
             >
               {isLogin ? "Sign up" : "Sign in"}
             </button>

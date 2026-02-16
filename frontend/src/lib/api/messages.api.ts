@@ -5,7 +5,6 @@ export const getInbox = async () => {
   return res.data.data;
 };
 
-
 export const sendMessageApi = async (payload: {
   conversation_id: string;
   content: string;
@@ -34,7 +33,6 @@ export const getConversationMessages = async (
   return res.data.data;
 };
 
-
 export const getReadMessages = async (conversationId: string, messageId: string) => {
   const res = await api.post(`/conversation/read`, {
     conversation_id: conversationId,
@@ -43,10 +41,9 @@ export const getReadMessages = async (conversationId: string, messageId: string)
   return res.data.data;
 };
 
-export const blockUserApi = async (payload: {
-  user_blocked: string;
-  is_blocking: boolean;
-}) => {
-  const res = await api.post("/block/user", payload);
-  return res.data;
+export const createConversation = (userIds: string[]) => {
+    return api.post("/conversation/create", {
+        user_ids: userIds,
+        type_name: "individual"
+    });
 };

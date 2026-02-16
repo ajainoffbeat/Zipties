@@ -10,6 +10,8 @@ import { resetPasswordSchema } from "@/lib/validators/resetpassword.schema";
 import { verifyResetToken, resetPassword } from "@/lib/api/auth.api";
 import { toast } from "@/hooks/use-toast";
 import InvalidResetLink from "./InvalidResetLink";
+import logo from "@/assets/logo.png";
+import { Footer } from "./Footer";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -64,7 +66,8 @@ if (!tokenValid) {
 }
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <>
+    <div className="min-h-[91vh] bg-background flex">
       <div className="flex-1 flex flex-col justify-center px-8 md:px-16 lg:px-24 p-5">
         <div className="max-w-md w-full mx-auto">
           <h1 className="text-3xl font-bold mb-2">Reset your password</h1>
@@ -142,13 +145,16 @@ if (!tokenValid) {
     
       <div className="hidden lg:flex flex-1 bg-gradient-hero items-center justify-center p-16">
         <div className="text-center text-primary-foreground">
+          <img src={logo} alt="Logo" className="w-20 h-20 mx-auto mb-4" />
           <h2 className="text-4xl font-bold">Almost done </h2>
           <p className="text-lg opacity-80">
             Choose a strong password to secure your account
           </p>
         </div>
       </div>
-      {/* <Footer /> */}
+     
     </div>
+     <Footer />
+     </>
   );
 }

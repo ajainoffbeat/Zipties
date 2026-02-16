@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import logo2 from "@/assets/logo.png";
 import { Footer } from "./Footer";
+import { useState } from "react";
+import { CheckCircle2 } from "lucide-react";
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,6 +22,7 @@ const forgotPasswordSchema = z.object({
 type ForgotPasswordForm = z.infer<typeof forgotPasswordSchema>;
 
 export default function ForgotPassword() {
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -32,22 +35,24 @@ export default function ForgotPassword() {
   });
 
   const onSubmit = async (data: ForgotPasswordForm) => {
+    setSuccessMessage(null);
     const result = await forgotPassword({ email: data.email });
-    if(result?.data?.message) {
-     toast({
-      title: "Success",
-      description: result.data.message,
-     });
+    if (result?.data?.message) {
+      setSuccessMessage(result.data.message);
+      toast({
+        title: "Success",
+        description: result.data.message,
+      });
     }
   };
 
   return (
     <>
       <div className="min-h-[90vh] flex">
-       
+
         <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 md:px-20">
           <div className="flex items-center gap-2 mb-6">
-            <span className="text-2xl font-bold text-foreground">Zipties</span>
+            <img src={logo2} width={35} height={35} alt="Logo" />
           </div>
 
           <h1 className="text-3xl font-bold mb-2">Forgot password?</h1>
@@ -66,12 +71,30 @@ export default function ForgotPassword() {
                 type="email"
                 placeholder="you@example.com"
                 {...register("email")}
+                className={successMessage == "A reset link has been sent to your email" ? "border-green-500 focus-visible:ring-green-500" : ""}
               />
 
               {errors.email && (
                 <p className="text-sm text-red-500 mt-1">
                   {errors.email.message}
                 </p>
+              )}
+
+              {successMessage == "A reset link has been sent to your email" && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-700 animate-in fade-in slide-in-from-top-1 duration-300">
+                  <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                  <p className="text-sm font-medium">
+                    {successMessage}
+                  </p>
+                </div>
+              )}
+              {successMessage == "User not found with this email" && (
+                <div className="mt-4 p-3 bg-green-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 animate-in fade-in slide-in-from-top-1 duration-300">
+                  <CheckCircle2 className="w-4 h-4 text-red-600 flex-shrink-0" />
+                  <p className="text-sm font-medium">
+                    User not found with this email.
+                  </p>
+                </div>
               )}
             </div>
 
@@ -88,7 +111,7 @@ export default function ForgotPassword() {
 
           <p className="text-sm text-gray-500 mt-6">
             Remember your password?{" "}
-            <Link to="/" className="text-primary font-medium">
+            <Link to="/" className="text-primary text-sm">
               Sign in
             </Link>
           </p>

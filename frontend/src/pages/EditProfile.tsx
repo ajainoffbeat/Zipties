@@ -15,7 +15,7 @@ import {
   profileSchema,
   ProfileFormValues,
 } from "@/lib/validators/profile.schema";
-import { getCitiesList, uploadAvatar } from "@/lib/api/auth.api";
+import { getCitiesList, uploadAvatar } from "@/lib/api/user.api";
 import { cn } from "@/lib/utils";
 import {
   Command,
@@ -33,10 +33,8 @@ import {
 import { debounce } from "lodash";
 
 export default function EditProfile() {
-  const { profile, fetchProfile, updateProfile } = useProfileStore();
-  const userId = useAuthStore(s => s.userId);
+  const { profile, updateProfile } = useProfileStore();
   const navigate = useNavigate();
-
   const [open, setOpen] = useState(false);
   const [cities, setCities] = useState<any[]>([]);
   const [citySearch, setCitySearch] = useState("");
@@ -64,10 +62,6 @@ export default function EditProfile() {
       cityName: "",
     },
   });
-
-  useEffect(() => {
-    if (userId) fetchProfile(userId);
-  }, [userId]);
 
   useEffect(() => {
     if (profile) {
@@ -185,7 +179,7 @@ export default function EditProfile() {
 
               <div className="flex-1 space-y-3">
                 <div className="space-y-1">
-                  <h3 className="font-semibold text-lg">Profile Picture</h3>
+                  <h3 className="font-semibold text-lg">{profile?.first_name + " " + profile?.last_name}</h3>
                   <p className="text-sm text-muted-foreground">
                     Upload a high-resolution image to represent yourself.
                   </p>
@@ -250,7 +244,7 @@ export default function EditProfile() {
               </div>
 
               <div>
-                <Label>Username</Label>
+                <Label>Nickname</Label>
                 <Input {...register("username")} />
                 {errors.username && (
                   <p className="text-sm text-destructive">
@@ -387,7 +381,7 @@ export default function EditProfile() {
 
             <Button
               type="button"
-              variant="outline"
+              variant="subtle"
               onClick={() => navigate("/profile")}
               className="flex-1"
             >

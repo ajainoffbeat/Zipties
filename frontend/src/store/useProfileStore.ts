@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { getProfile, getProfileById } from "@/lib/api/auth.api";
+import { editProfile, getProfile, getProfileById } from "@/lib/api/user.api";
 
 interface Profile {
   id: string;
@@ -14,14 +14,15 @@ interface Profile {
   interests?: string;
   tags?: string;
   joined_date?: string;
+  isblocked?: boolean;
 }
 
 interface ProfileState {
   profile: Profile | null;
   publicProfile: Profile | null;
   loading: boolean;
-  fetchProfile: (userId: string) => Promise<void>;
-  fetchProfileByUsername: (userId: string) => Promise<void>;
+  fetchProfile: () => Promise<void>;
+  fetchProfileById: (id: string) => Promise<void>;
   updateProfile: (data: Partial<Profile>) => Promise<void>;
 }
 
@@ -30,7 +31,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   publicProfile: null,
   loading: false,
 
-  fetchProfile: async (userId) => {
+  fetchProfile: async () => {
     set({ loading: true });
     try {
       const res = await getProfile();
@@ -44,10 +45,10 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     }
   },
 
-  fetchProfileByUsername: async (userId) => {
+  fetchProfileById: async (id) => {
     set({ loading: true, publicProfile: null });
     try {
-      const res = await getProfileById(userId);
+      const res = await getProfileById(id);
       set({
         publicProfile: res.data.data,
         loading: false,
@@ -62,7 +63,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   updateProfile: async (data) => {
     set({ loading: true });
     try {
-      // await editProfile(data);
+      await editProfile(data);
       const currentProfile = get().profile;
       if (currentProfile) {
         set({

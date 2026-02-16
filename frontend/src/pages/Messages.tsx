@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,19 +17,22 @@ import {
   Shield,
   Trash2,
   ChevronLeft,
-  MessageCircle
+  MessageCircle,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UserDropdownMenuTrigger } from "@/components/common/UserDropdown";
 import { useInboxStore } from "@/store/useInboxStore";
-import { getConversationMessages, getInbox, getReadMessages, blockUserApi } from "@/lib/api/conversation.api";
+import { getConversationMessages, getInbox, getReadMessages } from "@/lib/api/messages.api";
 import { Message, useMessageStore } from "@/store/useMessageStore";
-import { sendMessageApi } from "@/lib/api/conversation.api";
+import { sendMessageApi } from "@/lib/api/messages.api";
 import { socket } from "@/lib/socket";
 import { useAuthStore } from "@/store/authStore";
 import { useProfileStore } from "@/store/useProfileStore";
-import { toast } from "sonner";
 import { useSearchParams } from "react-router-dom";
+import { blockUser } from "@/lib/api/user.api";
+import { toast } from "@/hooks/use-toast";
+import { containsProfanity } from "@/lib/profanity";
 
 export default function Messages() {
   const [searchParams] = useSearchParams();
@@ -45,11 +48,12 @@ export default function Messages() {
 
   const { messages, addMessage, updateMessageStatus, updateMessageId, setMessages, prependMessages } = useMessageStore();
   const userId = useAuthStore((s) => s.userId);
-  const { profile, fetchProfile } = useProfileStore();
+  const { profile } = useProfileStore();
 
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const topObserverRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const shouldJumpRef = useRef(true);
@@ -64,14 +68,12 @@ export default function Messages() {
       const data = await getInbox();
       const normalizedInv = normalizeInbox(data);
       setConversations(normalizedInv);
-      if (userId) fetchProfile(userId);
-
       // Auto-select if ID provided in query param
       if (targetConvoId) {
         const target = normalizedInv.find(c => c.id === targetConvoId);
         if (target) {
           setSelectedConvo(target);
-          const apiMessages = await getConversationMessages(target.id, 1000, 0);
+          const apiMessages = await getConversationMessages(target.id, 20, 0);
           setMessages(normalizeMessages(apiMessages, userId!));
           if (apiMessages.length < 20) setHasMore(false);
         }
@@ -86,20 +88,22 @@ export default function Messages() {
     `${profile.first_name?.[0] || ""}${profile.last_name?.[0] || ""}`.toUpperCase() || "ME"
     : "ME";
 
+  const myAvatar = profile?.profile_image_url;
+
   useEffect(() => {
-    const lastMessage = messages[messages.length - 1];
-    if (lastMessage) {
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
       const isNewMessage = lastMessage.id !== lastMessageIdRef.current;
 
-      if (isNewMessage) {
-        if (shouldJumpRef.current || !lastMessageIdRef.current) {
-          scrollToBottom("auto");
-          shouldJumpRef.current = false;
-        } else {
-          scrollToBottom("smooth");
-        }
-        lastMessageIdRef.current = lastMessage.id;
+      if (shouldJumpRef.current) {
+        scrollToBottom("auto");
+        // Double scroll with a small delay to ensure rendering is complete
+        setTimeout(() => scrollToBottom("auto"), 100);
+        shouldJumpRef.current = false;
+      } else if (isNewMessage) {
+        scrollToBottom("smooth");
       }
+      lastMessageIdRef.current = lastMessage.id;
     }
   }, [messages, selectedConvo?.id]);
 
@@ -107,7 +111,7 @@ export default function Messages() {
     if (!selectedConvo || isLoadingMore || !hasMore) return;
 
     setIsLoadingMore(true);
-    const scrollContainer = topObserverRef.current?.parentElement;
+    const scrollContainer = scrollContainerRef.current;
     const oldScrollHeight = scrollContainer?.scrollHeight || 0;
 
     try {
@@ -124,13 +128,13 @@ export default function Messages() {
       if (apiMessages.length > 0) {
         prependMessages(normalizeMessages(apiMessages, userId!));
 
-        // Adjust scroll position after DOM update
-        setTimeout(() => {
+        // Use requestAnimationFrame or a slightly longer timeout to ensure content is painted
+        requestAnimationFrame(() => {
           if (scrollContainer) {
             const newScrollHeight = scrollContainer.scrollHeight;
             scrollContainer.scrollTop = newScrollHeight - oldScrollHeight;
           }
-        }, 0);
+        });
       }
     } catch (error) {
       console.error("Failed to load more messages", error);
@@ -138,6 +142,24 @@ export default function Messages() {
       setIsLoadingMore(false);
     }
   };
+
+  // Intersection Observer for Infinite Scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore && selectedConvo) {
+          handleLoadMore();
+        }
+      },
+      { threshold: 1.0 }
+    );
+
+    if (topObserverRef.current) {
+      observer.observe(topObserverRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasMore, isLoadingMore, selectedConvo, messages.length]);
 
 
   const normalizeInbox = (apiData: any[]) => {
@@ -150,13 +172,14 @@ export default function Messages() {
           .map((n: string) => n[0])
           .join("")
           .toUpperCase() ?? "U",
-        avatar: item.other_user_avatar,
+        avatar: item.other_user_profile_image_url,
       },
       lastMessage: item.last_message_content ?? "",
       time: new Date(item.last_message_at).toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
       }),
+      lastMessageAt: item.last_message_at,
       unread: item.unread_count ?? 0,
       online: false,
       otherUserId: item.other_user_id,
@@ -200,31 +223,21 @@ export default function Messages() {
   //   }
   // }, [token, profile]);
 
-  useEffect(() => {
-    socket.on("new_message", (payload) => {
-      addMessage({
-        id: payload.message_id,
-        conversationId: payload.conversation_id,
-        isread: true,
-        sender: "them",
-        content: payload.content,
-        time: new Date(payload.created_at).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        status: "delivered",
-      });
-    });
-
-    return () => {
-      socket.off("new_message");
-    };
-  }, []);
 
   const [newMessage, setNewMessage] = useState("");
 
   const handleSend = async () => {
     if (!newMessage.trim() || !selectedConvo) return;
+    console.log("newMessage", newMessage);
+    if (containsProfanity(newMessage)) {
+      console.log("Profanity detected");
+      toast({
+        title: "Message Blocked",
+        description: "Your message contains offensive language. Please keep the conversation respectful.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -259,10 +272,24 @@ export default function Messages() {
         message_id: res.message_id,
       });
 
+      // Update inbox summary immediately
+      updateConversation(selectedConvo.id, {
+        lastMessage: newMessage,
+        time: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        lastMessageAt: new Date().toISOString(),
+      });
+
     } catch (err: any) {
       const isBlocked = err.response?.data?.message?.includes("blocked") || err.message?.includes("blocked");
       if (isBlocked) {
-        toast.error("Cannot send message: You are blocked by the user.");
+        toast({
+          title: "Error",
+          description: "Cannot send message: You are blocked by the user.",
+          variant: "destructive",
+        });
       }
       updateMessageStatus(tempId, "error" as any);
     }
@@ -278,7 +305,7 @@ export default function Messages() {
         console.error("Cannot block: otherUserId is missing");
         return;
       }
-      const res = await blockUserApi({
+      const res = await blockUser({
         user_blocked: targetUserId,
         is_blocking: isBlocking
       });
@@ -305,8 +332,8 @@ export default function Messages() {
   };
   return (
     <AppLayout>
-      <div className="container mx-auto px-0 md:px-4 py-0 md:py-4">
-        <div className="max-w-6xl mx-auto bg-card md:rounded-2xl border-x-0 md:border border-border shadow-sm overflow-hidden h-[calc(100vh-4rem)] md:h-[calc(100vh-8rem)] relative">
+      <div className="container mx-auto px-0 md:px-4 py-0 md:py-1">
+        <div className="max-w-6xl mx-auto bg-card md:rounded-2xl border-x-0 md:border border-border shadow-sm overflow-hidden h-[calc(100vh-2rem)] md:h-[calc(100vh-8rem)] relative">
           <div className="flex h-full">
             {/* Conversations List */}
             <div className={cn(
@@ -327,19 +354,24 @@ export default function Messages() {
               </div>
 
               <div className="flex-1 overflow-y-auto">
-                {conversations?.map((convo) => (
+                {useMemo(() => {
+                  return [...(conversations || [])].sort((a, b) => {
+                    return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
+                  });
+                }, [conversations]).map((convo) => (
                   <button
                     key={convo.id}
                     onClick={async () => {
                       setSelectedConvo(convo);
                       shouldJumpRef.current = true;
                       setHasMore(true);
-                      const apiMessages = await getConversationMessages(convo.id, 1000, 0);
+                      const apiMessages = await getConversationMessages(convo.id, 20, 0);
                       const lastMessageId = apiMessages[apiMessages.length - 1]?.id;
                       if (lastMessageId) await getReadMessages(convo.id, lastMessageId);
                       setMessages(
                         normalizeMessages(apiMessages, userId!)
                       );
+                      updateConversation(convo.id, { unread: 0 });
                       if (apiMessages.length < 20) setHasMore(false);
                     }}
                     className={cn(
@@ -349,7 +381,7 @@ export default function Messages() {
                   >
                     <div className="relative">
                       <Avatar className="w-12 h-12">
-                        <AvatarImage src={`http://localhost:5000${convo.user.avatar}`} />
+                        <AvatarImage src={`${convo.user.avatar}`} />
                         <AvatarFallback className="bg-primary/10 text-primary font-medium">
                           {convo.user.initials}
                         </AvatarFallback>
@@ -361,13 +393,13 @@ export default function Messages() {
                     <div className="flex-1 min-w-0 text-left">
                       <div className="flex items-center justify-between">
 
-                        <span className="font-semibold text-foreground">{convo.user.name}</span>
-                        <span className="text-xs text-muted-foreground">{convo.time}</span>
+                        <span className={`text-foreground cursor-pointer ${selectedConvo?.id === convo.id && "text-gray-700  font-semibold"} ${convo.unread > 0 && "text-gray-700 font-bold text-lg "}`}>{convo.user.name}</span>
+                        <span className={`text-xs text-muted-foreground cursor-pointer ${selectedConvo?.id === convo.id && "text-gray-700"} ${convo.unread > 0 && "text-gray-700 font-bold text-xs"}`}>{convo.time}</span>
                       </div>
-                      <p className="text-sm text-muted-foreground truncate">{convo.lastMessage}</p>
+                      <p className={`text-sm text-muted-foreground truncate cursor-pointer ${selectedConvo?.id === convo.id && "text-gray-700"} ${convo.unread > 0 && "text-gray-700 font-bold text-xs"}`}>{convo.lastMessage}</p>
                     </div>
                     {convo.unread > 0 && (
-                      <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">
+                      <span className="w-5 h-5 rounded-full bg-primary text-white text-xs flex items-center justify-center font-medium">
                         {convo.unread}
                       </span>
                     )}
@@ -405,7 +437,7 @@ export default function Messages() {
                         <ChevronLeft className="h-5 w-5" />
                       </Button>
                       <Avatar className="w-10 h-10">
-                        <AvatarImage src={`http://localhost:5000${selectedConvo?.user?.avatar}`} />
+                        <AvatarImage src={`${selectedConvo?.user?.avatar}`} />
                         <AvatarFallback className="bg-primary/10 text-primary font-medium">
                           {selectedConvo?.user?.initials}
                         </AvatarFallback>
@@ -435,13 +467,20 @@ export default function Messages() {
                   </div>
 
                   {/* Messages */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4" onScroll={(e) => {
-                    const target = e.currentTarget;
-                    if (target.scrollTop === 0 && hasMore && !isLoadingMore && selectedConvo) {
-                      handleLoadMore();
-                    }
-                  }}>
+                  <div
+                    ref={scrollContainerRef}
+                    className="flex-1 overflow-y-auto p-4 space-y-4"
+                  >
+                    {/* Intersection Observer Target */}
                     <div ref={topObserverRef} className="h-1" />
+
+                    {/* Loading Spinner */}
+                    {isLoadingMore && (
+                      <div className="flex justify-center py-2">
+                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                      </div>
+                    )}
+
                     {messages.map((msg) => (
                       <div
                         key={msg.id}
@@ -452,6 +491,7 @@ export default function Messages() {
                       >
                         {msg.sender === "them" && (
                           <Avatar className="w-8 h-8 shrink-0">
+                            <AvatarImage src={`${selectedConvo?.user?.avatar}`} />
                             <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-medium">
                               {selectedConvo?.user?.initials}
                             </AvatarFallback>
@@ -480,6 +520,7 @@ export default function Messages() {
                         </div>
                         {msg.sender === "me" && (
                           <Avatar className="w-8 h-8 shrink-0">
+                            <AvatarImage src={`${myAvatar}`} />
                             <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-medium">
                               {myInitials}
                             </AvatarFallback>

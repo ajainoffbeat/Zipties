@@ -37,7 +37,7 @@ export function UserDropdownMenuTrigger({
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-25">
+      <DropdownMenuContent align="end" className="w-30">
         {actions.map((action, index) => (
           <DropdownMenuItem
             key={index}
@@ -45,7 +45,7 @@ export function UserDropdownMenuTrigger({
             onClick={() => action.onClick(userId)}
             className={cn(
               action.destructive &&
-                "text-destructive focus:text-destructive cursor-pointer"
+                "text-destructive focus:text-white cursor-pointer"
             )}
           >
             {action.icon && <span className="mr-2">{action.icon}</span>}
