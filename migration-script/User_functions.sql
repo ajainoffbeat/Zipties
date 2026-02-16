@@ -287,7 +287,7 @@ RETURNS TABLE(
     first_name text,
     last_name text,
     username character varying,
-    profile_image_url character varying
+    profile_image_url text
 )
 LANGUAGE plpgsql
 AS $BODY$
@@ -297,7 +297,7 @@ BEGIN
         u.firstname::text AS first_name,
         u.lastname::text AS last_name,
         u.username,
-        u.profile_image_url
+        u.profile_image_url::text AS profile_image_url
     FROM "user" u
     WHERE (
             u.firstname ILIKE '%' || p_query || '%'
