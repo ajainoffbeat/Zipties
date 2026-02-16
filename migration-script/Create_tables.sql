@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS public."user" (
     city_id UUID,
 
     bio VARCHAR(100),
-    profile_image_url VARCHAR(100),
+    profile_image_url TEXT,
 
     interests TEXT,
     tags TEXT,

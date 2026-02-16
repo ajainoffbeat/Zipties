@@ -227,7 +227,7 @@ CREATE OR REPLACE FUNCTION public.fn_get_cities(
         name character varying(100),
         city character varying(100),
         state character varying(100)
-    ) LANGUAGE plpgsql VOLATILE AS $BODY$ BEGIN RETURN QUERY
+    ) LANGUAGE plpgsql VOLATILE AS $$ BEGIN RETURN QUERY
 SELECT c.id,
     c.name,
     c.city,
@@ -247,7 +247,7 @@ WHERE c.country_code = p_country_code
 ORDER BY c.city
 LIMIT p_limit OFFSET p_offset;
 END;
-$BODY$;
+$$;
 
 -- ============================================================================
 -- Function Name : fn_is_user_blocked
@@ -290,7 +290,7 @@ RETURNS TABLE(
     profile_image_url text
 )
 LANGUAGE plpgsql
-AS $BODY$
+AS $$
 BEGIN
     RETURN QUERY
     SELECT u.id,
@@ -308,4 +308,4 @@ BEGIN
         AND NOT public.fn_is_user_blocked(u.id, p_current_user_id)
     LIMIT 10;
 END;
-$BODY$;
+$$;

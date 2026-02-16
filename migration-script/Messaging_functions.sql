@@ -8,57 +8,43 @@
 -- Created On    : 29/01/2025
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.fn_get_or_create_conversation(
-    p_user_ids UUID[],
-    p_type_name VARCHAR,
-    p_source_type_name VARCHAR DEFAULT NULL,
-    p_source_id UUID DEFAULT NULL,
-    p_created_by UUID DEFAULT NULL
-)
-RETURNS UUID
-AS $$
-DECLARE
-    v_conversation_id UUID;
-    v_type_id UUID;
-    v_source_type_id UUID;
-    v_is_direct BOOLEAN;
+        p_user_ids UUID [],
+        p_type_name VARCHAR,
+        p_source_type_name VARCHAR DEFAULT NULL,
+        p_source_id UUID DEFAULT NULL,
+        p_created_by UUID DEFAULT NULL
+    ) RETURNS UUID AS $$
+DECLARE v_conversation_id UUID;
+v_type_id UUID;
+v_source_type_id UUID;
+v_is_direct BOOLEAN;
 BEGIN
-    SELECT id
-    INTO v_type_id
-    FROM conversation_type
-    WHERE name = p_type_name;
-
-    IF v_type_id IS NULL THEN
-        RAISE EXCEPTION 'Invalid conversation type: %', p_type_name;
-    END IF;
-
-    v_is_direct := (p_type_name = 'individual');
-
-    IF v_is_direct AND array_length(p_user_ids, 1) = 2 THEN
-        SELECT cm1.conversation_id
-        INTO v_conversation_id
-        FROM conversation_member cm1
-        JOIN conversation_member cm2
-            ON cm1.conversation_id = cm2.conversation_id
-        JOIN conversation c
-            ON cm1.conversation_id = c.id
-        WHERE c.conversation_type_id = v_type_id
-          AND cm1.user_id = p_user_ids[1]
-          AND cm2.user_id = p_user_ids[2]
-        LIMIT 1;
-
-        IF v_conversation_id IS NOT NULL THEN
-            RETURN v_conversation_id;
-        END IF;
-    END IF;
-
-    IF p_source_type_name IS NOT NULL THEN
-        SELECT id
-        INTO v_source_type_id
-        FROM conversation_source_type
-        WHERE name = p_source_type_name;
-    END IF;
-
-    INSERT INTO conversation (
+SELECT id INTO v_type_id
+FROM conversation_type
+WHERE name = p_type_name;
+IF v_type_id IS NULL THEN RAISE EXCEPTION 'Invalid conversation type: %',
+p_type_name;
+END IF;
+v_is_direct := (p_type_name = 'individual');
+IF v_is_direct
+AND array_length(p_user_ids, 1) = 2 THEN
+SELECT cm1.conversation_id INTO v_conversation_id
+FROM conversation_member cm1
+    JOIN conversation_member cm2 ON cm1.conversation_id = cm2.conversation_id
+    JOIN conversation c ON cm1.conversation_id = c.id
+WHERE c.conversation_type_id = v_type_id
+    AND cm1.user_id = p_user_ids [1]
+    AND cm2.user_id = p_user_ids [2]
+LIMIT 1;
+IF v_conversation_id IS NOT NULL THEN RETURN v_conversation_id;
+END IF;
+END IF;
+IF p_source_type_name IS NOT NULL THEN
+SELECT id INTO v_source_type_id
+FROM conversation_source_type
+WHERE name = p_source_type_name;
+END IF;
+INSERT INTO conversation (
         conversation_type_id,
         conversation_source_type_id,
         source_id,
@@ -66,7 +52,7 @@ BEGIN
         last_message_at,
         title
     )
-    VALUES (
+VALUES (
         v_type_id,
         v_source_type_id,
         p_source_id,
@@ -77,26 +63,22 @@ BEGIN
             ELSE 'New Conversation'
         END
     )
-    RETURNING id INTO v_conversation_id;
-
-    INSERT INTO conversation_member (
+RETURNING id INTO v_conversation_id;
+INSERT INTO conversation_member (
         conversation_id,
         user_id,
         created_at,
         unread_count,
         created_by
     )
-    SELECT
-        v_conversation_id,
-        unnest(p_user_ids),
-        NOW(),
-        0,
-        p_created_by;
-
-    RETURN v_conversation_id;
+SELECT v_conversation_id,
+    unnest(p_user_ids),
+    NOW(),
+    0,
+    p_created_by;
+RETURN v_conversation_id;
 END;
 $$ LANGUAGE plpgsql;
-
 -- ============================================================================
 -- Function Name : fn_mark_conversation_read
 -- Purpose       : Marks a conversation as read for a specific user by resetting
@@ -119,109 +101,117 @@ WHERE conversation_id = p_conversation_id
     AND user_id = p_user_id;
 END;
 $$ LANGUAGE plpgsql;
--- FUNCTION: public.fn_get_user_inbox(uuid)
 
--- DROP FUNCTION IF EXISTS public.fn_get_user_inbox(uuid);
-
+-- ============================================================================
+-- Function Name : fn_get_user_inbox
+-- Purpose       : Retrieves a user's inbox with conversation details, including
+--                 unread counts, last messages, and block status.
+--                 Used for displaying the user's inbox in the UI.
+-- Author        : OFFBEAT
+-- Created On    : 29/01/2025
+-- ============================================================================
 CREATE OR REPLACE FUNCTION public.fn_get_user_inbox(
 	p_user_id uuid)
-    RETURNS TABLE(conversation_id uuid, title character varying, type_name character varying, unread_count integer, last_message_content text, last_message_at timestamp without time zone, last_message_sender_id uuid, last_message_sender_name text, source_type character varying, source_id uuid, is_blocked boolean, blocked_by uuid, other_user_id uuid) 
+    RETURNS TABLE(conversation_id uuid, title character varying, type_name character varying, unread_count integer, last_message_preview text, last_message_at timestamp without time zone, last_message_sender_id uuid, last_message_sender_name text, source_type character varying, source_id uuid, is_blocked boolean, blocked_by uuid, other_user_id uuid, other_user_profile_image_url text) 
     LANGUAGE 'plpgsql'
     COST 100
     VOLATILE PARALLEL UNSAFE
     ROWS 1000
-
-AS $BODY$
+ 
+AS $$
 BEGIN
-    RETURN QUERY
+  RETURN QUERY
+  SELECT
+    c.id AS conversation_id,
+ 
+    -- viewer-dependent title (1-to-1 chat)
+    CASE
+      WHEN ct.name = 'individual' THEN
+        COALESCE(
+          NULLIF(TRIM(u_other.firstname || ' ' || u_other.lastname), ''),
+          u_other.username
+        )
+      ELSE
+        c.title
+    END AS title,
+ 
+    ct.name AS type_name,
+    cm.unread_count,
+ 
+    -- 🔐 encrypted chat: never expose message content
+  CASE
+  WHEN block_info.is_blocked THEN NULL
+  ELSE m.content
+END AS last_message_preview,
+ 
+    c.last_message_at,
+    m.sender_id AS last_message_sender_id,
+    u_sender.username::text AS last_message_sender_name,
+    cst.name AS source_type,
+    c.source_id,
+ 
+    COALESCE(block_info.is_blocked, FALSE) AS is_blocked,
+    block_info.blocked_by,
+ 
+    cm_other.user_id AS other_user_id,
+ 
+    -- other user's avatar
+    CASE
+      WHEN block_info.is_blocked THEN NULL
+      ELSE u_other.profile_image_url
+    END AS other_user_profile_image_url
+ 
+  FROM conversation_member cm
+  JOIN conversation c
+    ON cm.conversation_id = c.id
+  JOIN conversation_type ct
+    ON c.conversation_type_id = ct.id
+ 
+  JOIN conversation_member cm_other
+    ON cm_other.conversation_id = c.id
+   AND cm_other.user_id <> p_user_id
+ 
+  JOIN public."user" u_other
+    ON u_other.id = cm_other.user_id
+ 
+  LEFT JOIN conversation_source_type cst
+    ON c.conversation_source_type_id = cst.id
+ 
+  -- last message (ONLY metadata)
+LEFT JOIN LATERAL (
+  SELECT
+    m2.sender_id,
+    m2.content
+  FROM message m2
+  WHERE m2.conversation_id = c.id
+  ORDER BY m2.created_at DESC
+  LIMIT 1
+) m ON TRUE
+ 
+  LEFT JOIN public."user" u_sender
+    ON u_sender.id = m.sender_id
+ 
+  -- block info
+  LEFT JOIN LATERAL (
     SELECT
-        c.id AS conversation_id,
-
-        -- 🔥 viewer-dependent title (Instagram-style)
-        CASE
-            WHEN ct.name = 'individual' THEN
-                COALESCE(
-                    NULLIF(trim(u_other.firstname || ' ' || u_other.lastname), ''),
-                    u_other.username
-                )
-            ELSE
-                c.title
-        END AS title,
-
-        ct.name AS type_name,
-        cm.unread_count,
-
-        CASE
-            WHEN block_info.is_blocked THEN NULL
-            ELSE m.content
-        END AS last_message_content,
-
-        c.last_message_at,
-        m.sender_id AS last_message_sender_id,
-        u_sender.username::text AS last_message_sender_name,
-        cst.name AS source_type,
-        c.source_id,
-
-        COALESCE(block_info.is_blocked, FALSE) AS is_blocked,
-        block_info.blocked_by,
-
-        cm_other.user_id AS other_user_id
-
-    FROM conversation_member cm
-    JOIN conversation c
-        ON cm.conversation_id = c.id
-    JOIN conversation_type ct
-        ON c.conversation_type_id = ct.id
-
-    -- 🔹 other participant (1-to-1)
-    JOIN conversation_member cm_other
-        ON cm_other.conversation_id = c.id
-       AND cm_other.user_id <> p_user_id
-
-    -- 🔹 other user's profile (for title)
-    JOIN public."user" u_other
-        ON u_other.id = cm_other.user_id
-
-    LEFT JOIN conversation_source_type cst
-        ON c.conversation_source_type_id = cst.id
-
-    -- 🔹 last message
-    LEFT JOIN LATERAL (
-        SELECT m2.content, m2.sender_id
-        FROM message m2
-        WHERE m2.conversation_id = c.id
-        ORDER BY m2.created_at DESC
-        LIMIT 1
-    ) m ON TRUE
-
-    -- 🔹 last message sender
-    LEFT JOIN public."user" u_sender
-        ON u_sender.id = m.sender_id
-
-    -- 🔹 block info (either side)
-    LEFT JOIN LATERAL (
-        SELECT
-            TRUE AS is_blocked,
-            ur.user_id AS blocked_by
-        FROM user_report ur
-        WHERE (
-                ur.user_id = p_user_id
-            AND ur.blocked_user_id = cm_other.user_id
-        )
-        OR (
-                ur.user_id = cm_other.user_id
-            AND ur.blocked_user_id = p_user_id
-        )
-        LIMIT 1
-    ) block_info ON TRUE
-
-    WHERE cm.user_id = p_user_id
-    ORDER BY c.last_message_at DESC NULLS LAST;
+      TRUE AS is_blocked,
+      ur.user_id AS blocked_by
+    FROM user_report ur
+    WHERE (
+      ur.user_id = p_user_id
+      AND ur.blocked_user_id = cm_other.user_id
+    )
+    OR (
+      ur.user_id = cm_other.user_id
+      AND ur.blocked_user_id = p_user_id
+    )
+    LIMIT 1
+  ) block_info ON TRUE
+ 
+  WHERE cm.user_id = p_user_id
+  ORDER BY c.last_message_at DESC NULLS LAST;
 END;
-$BODY$;
-
-ALTER FUNCTION public.fn_get_user_inbox(uuid)
-    OWNER TO postgres;
+$$;
 -- ============================================================================
 -- Function Name : fn_update_unread_counts
 -- Purpose       : Increments unread message count for all conversation members
@@ -266,41 +256,24 @@ $$ LANGUAGE plpgsql;
 -- Created On    : 29/01/2025
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.fn_send_message(
-        p_conversation_id UUID,
-        p_sender_id UUID,
-        p_content TEXT,
-        p_content_type_name VARCHAR DEFAULT 'text'
-    ) RETURNS UUID AS $$
-DECLARE v_message_id UUID;
-v_content_type_id UUID;
-v_now TIMESTAMP := NOW();
-BEGIN
-SELECT id INTO v_content_type_id
-FROM message_content_type
-WHERE name = p_content_type_name;
-IF v_content_type_id IS NULL THEN RAISE EXCEPTION 'Invalid content type: %',
-p_content_type_name;
+        p_conversation_id uuid,
+        p_sender_id uuid,
+        p_content text,
+        p_iv text,
+        p_auth_tag text,
+        p_content_type text
+    ) RETURNS uuid LANGUAGE 'plpgsql' COST 100 VOLATILE PARALLEL UNSAFE AS $$
+DECLARE v_message_id uuid;
+v_message_content_type_id uuid;
+BEGIN -- resolve message content type
+SELECT id INTO v_message_content_type_id
+FROM public.message_content_type
+WHERE name = p_content_type
+LIMIT 1;
+IF v_message_content_type_id IS NULL THEN RAISE EXCEPTION 'Invalid message content type: %',
+p_content_type;
 END IF;
-IF EXISTS (
-    SELECT 1
-    FROM conversation_member cm
-    WHERE cm.conversation_id = p_conversation_id
-        AND cm.user_id != p_sender_id
-        AND EXISTS (
-            SELECT 1
-            FROM user_report ur
-            WHERE (
-                    ur.user_id = p_sender_id
-                    AND ur.blocked_user_id = cm.user_id
-                )
-                OR (
-                    ur.user_id = cm.user_id
-                    AND ur.blocked_user_id = p_sender_id
-                )
-        )
-) THEN RAISE EXCEPTION 'Message blocked: One of the users has blocked the other.';
-END IF;
-INSERT INTO message (
+INSERT INTO public.message (
         conversation_id,
         sender_id,
         content,
@@ -312,16 +285,15 @@ VALUES (
         p_conversation_id,
         p_sender_id,
         p_content,
-        v_content_type_id,
+        -- ✅ encrypted Base64 here
+        v_message_content_type_id,
         p_sender_id,
-        v_now
+        NOW()
     )
 RETURNING id INTO v_message_id;
-PERFORM fn_update_last_message_at(p_conversation_id, v_now);
-PERFORM fn_update_unread_counts(p_conversation_id, p_sender_id);
 RETURN v_message_id;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 -- ============================================================================
 -- Function Name : fn_update_user_socket
 -- Purpose       : Updates a user's socket connection ID and timestamp for
@@ -408,7 +380,7 @@ $$ LANGUAGE plpgsql;
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.fn_add_conversation_members(
         p_conversation_id UUID,
-        p_user_ids UUID[]
+        p_user_ids UUID []
     ) RETURNS VOID AS $$ BEGIN
 INSERT INTO conversation_member (
         conversation_id,
