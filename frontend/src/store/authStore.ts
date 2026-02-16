@@ -2,6 +2,10 @@ import { create } from "zustand";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 
+import { useProfileStore } from "./useProfileStore";
+import { useInboxStore } from "./useInboxStore";
+import { useMessageStore } from "./useMessageStore";
+
 type JwtPayload = {
   userId: string;
   email?: string;
@@ -37,6 +41,9 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: () => {
     Cookies.remove("token");
+    useProfileStore.getState().resetProfile();
+    useInboxStore.getState().resetInbox();
+    useMessageStore.getState().resetMessages();
     set({ token: null, userId: null, isInitialized: true });
   },
 

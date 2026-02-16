@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { editProfile, getProfile, getProfileById } from "@/lib/api/user.api";
+import { editProfile, getProfileById } from "@/lib/api/user.api";
 
 interface Profile {
   id: string;
@@ -21,9 +21,10 @@ interface ProfileState {
   profile: Profile | null;
   publicProfile: Profile | null;
   loading: boolean;
-  fetchProfile: () => Promise<void>;
   fetchProfileById: (id: string) => Promise<void>;
+  fetchMyProfile: (id: string) => Promise<void>;
   updateProfile: (data: Partial<Profile>) => Promise<void>;
+  resetProfile: () => void;
 }
 
 export const useProfileStore = create<ProfileState>((set, get) => ({
@@ -31,19 +32,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   publicProfile: null,
   loading: false,
 
-  fetchProfile: async () => {
-    set({ loading: true });
-    try {
-      const res = await getProfile();
-      set({
-        profile: res.data.data,
-        loading: false,
-      });
-    } catch (error) {
-      set({ loading: false });
-      console.error("Fetch profile failed", error);
-    }
-  },
+  resetProfile: () => set({ profile: null, publicProfile: null, loading: false }),
 
   fetchProfileById: async (id) => {
     set({ loading: true, publicProfile: null });
@@ -56,6 +45,21 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     } catch (error) {
       set({ loading: false });
       console.error("Fetch public profile failed", error);
+      throw error;
+    }
+  },
+
+  fetchMyProfile: async (id) => {
+    set({ loading: true });
+    try {
+      const res = await getProfileById(id);
+      set({
+        profile: res.data.data,
+        loading: false,
+      });
+    } catch (error) {
+      set({ loading: false });
+      console.error("Fetch my profile failed", error);
       throw error;
     }
   },

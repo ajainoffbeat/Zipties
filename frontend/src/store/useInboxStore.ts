@@ -25,12 +25,15 @@ interface InboxState {
   setSelectedConvo: (convo: Conversation) => void;
   updateConversation: (convoId: string, payload: Partial<Conversation>) => void;
   incrementUnreadCount: (convoId: string) => void;
+  resetInbox: () => void;
 }
 
 export const useInboxStore = create<InboxState>()(
   devtools((set) => ({
     conversations: [],
     selectedConvo: null,
+
+    resetInbox: () => set({ conversations: [], selectedConvo: null }),
 
     setConversations: (data) =>
       set({

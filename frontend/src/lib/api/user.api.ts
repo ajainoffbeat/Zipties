@@ -2,7 +2,6 @@ import { ProfileFormValues } from "../validators/profile.schema";
 import { api } from "./client";
 
 export const getProfileById = (id: string) => api.get(`/user/profile/${id}`);
-export const getProfile = () => api.get(`/user/profile`);
 export const searchUsers = (query: string) => api.get(`/user/search?q=${query}`);
 export const getCitiesList = (search?: string) => api.get(`/user/cities${search ? `?q=${search}` : ""}`);
 export const uploadAvatar = (formData: FormData) =>

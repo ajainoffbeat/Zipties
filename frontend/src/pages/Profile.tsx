@@ -40,13 +40,13 @@ export default function Profile() {
   const [isBlocking, setIsBlocking] = useState(false);
 
   useEffect(() => {
-    if (userId) {
+    if (userId && userId !== loggedInUserId) {
       fetchProfileById(userId);
     }
-  }, [userId]);
+  }, [userId, loggedInUserId, fetchProfileById]);
 
-  const displayProfile = userId ? publicProfile : profile;
-  const isOwnProfile = !userId || (displayProfile?.id === loggedInUserId);
+  const displayProfile = userId && userId !== loggedInUserId ? publicProfile : profile;
+  const isOwnProfile = !userId || (userId === loggedInUserId);
 
   const handleEditProfile = () => {
     navigate("/edit-profile");
@@ -91,7 +91,7 @@ export default function Profile() {
       setIsBlocking(false);
     }
   };
-  
+
 
   return (
     <AppLayout>
@@ -134,26 +134,26 @@ export default function Profile() {
                           Message
                         </Button>
                         {displayProfile?.isblocked ? (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="gap-1 px-4 text-gray-500 hover:text-gray-500 hover:bg-gray-500/10"
-                              onClick={() => handleBlockUser(false)}
-                            >
-                              <Ban className="w-4 h-4" />
-                              Unblock
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1 px-4 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => setBlockDialogOpen(true)}
-                            >
-                              <Ban className="w-4 h-4" />
-                              Block
-                            </Button>
-                          )
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="gap-1 px-4 text-gray-500 hover:text-gray-500 hover:bg-gray-500/10"
+                            onClick={() => handleBlockUser(false)}
+                          >
+                            <Ban className="w-4 h-4" />
+                            Unblock
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1 px-4 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setBlockDialogOpen(true)}
+                          >
+                            <Ban className="w-4 h-4" />
+                            Block
+                          </Button>
+                        )
                         }
                       </>
                     )}
