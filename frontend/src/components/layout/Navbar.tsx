@@ -43,6 +43,7 @@ import { useTotalUnreadCount } from "@/store/useInboxStore";
 import { useProfileStore } from "@/store/useProfileStore";
 import { useAuthStore } from "@/store/authStore";
 
+
 const navItems = [
   { path: "/feed", label: "Feed", icon: Home },
   { label: "Proposals", icon: Users },
@@ -59,8 +60,9 @@ export function Navbar() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const unreadCount = useTotalUnreadCount();
-  const { profile, fetchProfile } = useProfileStore();
-
+  const { profile, fetchMyProfile } = useProfileStore();
+  const logout = useAuthStore((s) => s.logout);
+  const userId = useAuthStore((s) => s.userId);
   const performSearch = useCallback(
     debounce(async (query: string) => {
       if (!query.trim()) {
@@ -81,8 +83,10 @@ export function Navbar() {
   );
 
   useEffect(() => {
-    fetchProfile();
-  }, []);
+    if (userId) {
+      fetchMyProfile(userId);
+    }
+  }, [userId, fetchMyProfile]);
 
 
   useEffect(() => {
@@ -237,7 +241,7 @@ export function Navbar() {
                 <DropdownMenuItem
                   className="text-destructive focus:text-white cursor-pointer"
                   onClick={() => {
-                    removeCookie("token");
+                    logout();
                     navigate("/");
                   }}
                 >
@@ -317,7 +321,7 @@ export function Navbar() {
                       className="text-destructive focus:text-destructive"
                       onClick={() => {
                         setMobileMenuOpen(false);
-                        removeCookie("token");
+                        logout();
                         navigate("/");
                       }}
                     >

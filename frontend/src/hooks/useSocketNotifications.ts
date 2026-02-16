@@ -22,8 +22,6 @@ export const useSocketNotifications = () => {
 
         const decryptedContent = await decryptMessage(
             payload.content,
-            payload.iv || "",
-            payload.auth_tag || ""
         );
 
         // 1. Add message to the message store ONLY if it belongs to the active conversation
