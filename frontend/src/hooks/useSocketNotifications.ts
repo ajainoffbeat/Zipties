@@ -4,6 +4,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useSocketEvent } from "./useSocketEvent";
 import { formatMessageTime } from "@/utils/date";
 import { NewMessagePayload } from "@/types/socket";
+import { decryptMessage } from "@/lib/encryption";
 
 /**
  * Hook to handle real-time notifications via Socket.io.
@@ -14,10 +15,16 @@ export const useSocketNotifications = () => {
     const { addMessage } = useMessageStore();
     const userId = useAuthStore((s) => s.userId);
 
-    useSocketEvent<NewMessagePayload>("new_message", (payload) => {
+    useSocketEvent<NewMessagePayload>("new_message", async (payload) => {
         const isFromMe = String(payload.sender_id) === String(userId);
         const isCurrentConvo = payload.conversation_id === selectedConvo?.id;
         const formattedTime = formatMessageTime(payload.created_at);
+
+        const decryptedContent = await decryptMessage(
+            payload.content,
+            payload.iv || "",
+            payload.auth_tag || ""
+        );
 
         // 1. Add message to the message store ONLY if it belongs to the active conversation
         if (isCurrentConvo) {
@@ -26,7 +33,7 @@ export const useSocketNotifications = () => {
                 conversationId: payload.conversation_id,
                 isread: isCurrentConvo,
                 sender: isFromMe ? "me" : "them",
-                content: payload.content,
+                content: decryptedContent,
                 time: formattedTime,
                 status: "delivered",
             });
@@ -34,7 +41,7 @@ export const useSocketNotifications = () => {
 
         // 2. Update conversation summary in the inbox list
         updateConversation(payload.conversation_id, {
-            lastMessage: payload.content,
+            lastMessage: decryptedContent,
             time: formattedTime,
             lastMessageAt: payload.created_at,
         });

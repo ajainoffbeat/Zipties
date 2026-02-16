@@ -27,6 +27,8 @@ export interface NewMessagePayload {
   sender_id: string;
   sender_name: string;
   content: string;
+  iv?: string;
+  auth_tag?: string;
   content_type: string;
   created_at: string;
 }
@@ -60,6 +62,8 @@ export interface CreateConversationRequest {
 export interface SendMessageRequest {
   conversation_id: string;
   content: string;
+  iv?: string;
+  auth_tag?: string;
   content_type_name?: 'text' | 'image';
 }
 
@@ -87,6 +91,8 @@ export interface MessageResponse {
   sender_id: string;
   sender_name: string;
   content: string;
+  iv?: string;
+  auth_tag?: string;
   content_type: string;
   created_at: string;
 }
@@ -97,6 +103,8 @@ export interface InboxItem {
   type_name: string;
   unread_count: number;
   last_message_content: string;
+  last_message_iv: string | null;
+  last_message_auth_tag: string | null;
   last_message_at: string;
   last_message_sender_id: string;
   last_message_sender_name: string;

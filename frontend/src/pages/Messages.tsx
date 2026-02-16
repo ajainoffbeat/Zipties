@@ -33,6 +33,7 @@ import { useSearchParams } from "react-router-dom";
 import { blockUser } from "@/lib/api/user.api";
 import { toast } from "@/hooks/use-toast";
 import { containsProfanity } from "@/lib/profanity";
+import { encryptMessage, decryptMessage } from "@/lib/encryption";
 
 export default function Messages() {
   const [searchParams] = useSearchParams();
@@ -66,7 +67,7 @@ export default function Messages() {
   useEffect(() => {
     const loadInbox = async () => {
       const data = await getInbox();
-      const normalizedInv = normalizeInbox(data);
+      const normalizedInv = await normalizeInbox(data);
       setConversations(normalizedInv);
       // Auto-select if ID provided in query param
       if (targetConvoId) {
@@ -74,7 +75,8 @@ export default function Messages() {
         if (target) {
           setSelectedConvo(target);
           const apiMessages = await getConversationMessages(target.id, 20, 0);
-          setMessages(normalizeMessages(apiMessages, userId!));
+          const normalizedMsgs = await normalizeMessages(apiMessages, userId!);
+          setMessages(normalizedMsgs);
           if (apiMessages.length < 20) setHasMore(false);
         }
       } else {
@@ -126,7 +128,8 @@ export default function Messages() {
       }
 
       if (apiMessages.length > 0) {
-        prependMessages(normalizeMessages(apiMessages, userId!));
+        const normalizedMsgs = await normalizeMessages(apiMessages, userId!);
+        prependMessages(normalizedMsgs);
 
         // Use requestAnimationFrame or a slightly longer timeout to ensure content is painted
         requestAnimationFrame(() => {
@@ -162,8 +165,8 @@ export default function Messages() {
   }, [hasMore, isLoadingMore, selectedConvo, messages.length]);
 
 
-  const normalizeInbox = (apiData: any[]) => {
-    return apiData.map((item) => ({
+  const normalizeInbox = async (apiData: any[]) => {
+    return Promise.all(apiData.map(async (item) => ({
       id: item.conversation_id,
       user: {
         name: item.title ?? "Unknown",
@@ -174,7 +177,8 @@ export default function Messages() {
           .toUpperCase() ?? "U",
         avatar: item.other_user_profile_image_url,
       },
-      lastMessage: item.last_message_content ?? "",
+      lastMessage: await decryptMessage(
+        item.last_message_preview ?? ""),
       time: new Date(item.last_message_at).toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
@@ -185,30 +189,29 @@ export default function Messages() {
       otherUserId: item.other_user_id,
       isBlocked: item.is_blocked ?? false,
       blockedBy: item.blocked_by,
-    }));
+    })));
   };
 
-  const normalizeMessages = (apiMessages: any[], myUserId: string): Message[] => {
+  const normalizeMessages = async (apiMessages: any[], myUserId: string): Promise<Message[]> => {
     const currentUserId = myUserId || userId;
-    return apiMessages.map((msg) => {
+    // Reverse because backend returns newest first (DESC), but UI renders top-to-bottom (ASC)
+    const reversedMessages = [...apiMessages].reverse();
+    return Promise.all(reversedMessages.map(async (msg) => {
       const isMe = String(msg.sender_id) === String(currentUserId);
-      if (isMe) {
-        if (msg === apiMessages[0]) console.log("Successful sender match found!");
-      }
 
       return {
         id: msg.id,
         isread: msg.isread,
         conversationId: msg.conversation_id,
         sender: isMe ? "me" : "them",
-        content: msg.content,
+        content: await decryptMessage(msg.content),
         time: new Date(msg.created_at).toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
         }),
         status: "read" as const,
       };
-    });
+    }));
   };
 
 
@@ -257,9 +260,11 @@ export default function Messages() {
     setNewMessage("");
 
     try {
+      const encrypted = await encryptMessage(newMessage);
+
       const res = await sendMessageApi({
         conversation_id: selectedConvo.id,
-        content: newMessage,
+        content: encrypted,
       });
 
       // Update temp ID with real ID and set status to sent
@@ -268,7 +273,7 @@ export default function Messages() {
 
       socket.emit("new_message", {
         conversation_id: selectedConvo.id,
-        content: newMessage,
+        content: encrypted,
         message_id: res.message_id,
       });
 
@@ -362,15 +367,15 @@ export default function Messages() {
                   <button
                     key={convo.id}
                     onClick={async () => {
+                      setMessages([]); // Clear messages immediately to prevent flicker
                       setSelectedConvo(convo);
                       shouldJumpRef.current = true;
                       setHasMore(true);
                       const apiMessages = await getConversationMessages(convo.id, 20, 0);
                       const lastMessageId = apiMessages[apiMessages.length - 1]?.id;
                       if (lastMessageId) await getReadMessages(convo.id, lastMessageId);
-                      setMessages(
-                        normalizeMessages(apiMessages, userId!)
-                      );
+                      const normalizedMsgs = await normalizeMessages(apiMessages, userId!);
+                      setMessages(normalizedMsgs);
                       updateConversation(convo.id, { unread: 0 });
                       if (apiMessages.length < 20) setHasMore(false);
                     }}

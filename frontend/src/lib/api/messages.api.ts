@@ -8,6 +8,8 @@ export const getInbox = async () => {
 export const sendMessageApi = async (payload: {
   conversation_id: string;
   content: string;
+  iv?: string;
+  auth_tag?: string;
   content_type_name?: "text" | "image";
 }) => {
   const res = await api.post("/conversation/message", {
@@ -42,8 +44,8 @@ export const getReadMessages = async (conversationId: string, messageId: string)
 };
 
 export const createConversation = (userIds: string[]) => {
-    return api.post("/conversation/create", {
-        user_ids: userIds,
-        type_name: "individual"
-    });
+  return api.post("/conversation/create", {
+    user_ids: userIds,
+    type_name: "individual"
+  });
 };

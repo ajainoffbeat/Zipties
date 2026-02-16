@@ -21,9 +21,9 @@ export const createConversation = async (req: Request, res: Response) => {
     const { user_ids, type_name, source_type_name, source_id } =
       req.body as CreateConversationRequest;
     const token = extractBearerToken(req.headers.authorization);
-    const {userId} = decodeToken(token);
-    
- // From auth middleware
+    const { userId } = decodeToken(token);
+
+    // From auth middleware
 
     const conversationId = await getOrCreateConversationService(
       user_ids,
@@ -52,25 +52,32 @@ export const createConversation = async (req: Request, res: Response) => {
  */
 export const sendMessage = async (req: Request, res: Response) => {
   try {
-    const { conversation_id, content, content_type_name } =
+    const { conversation_id, content, iv, auth_tag, content_type_name } =
       req.body as SendMessageRequest;
-    const customFilter = new Filter({ placeHolder: 'x' })
-    const filtered_message=customFilter.clean(content)
-    
-    if (content !== filtered_message) {
-      return res.status(400).json({
-        status: 1,
-        message: "Message contains inappropriate content",
-      });
+
+    // If it's an encrypted message (has iv and auth_tag), we skip profanity check
+    // as we cannot read the content.
+    if (!iv && !auth_tag) {
+      const customFilter = new Filter({ placeHolder: 'x' })
+      const filtered_message = customFilter.clean(content)
+
+      if (content !== filtered_message) {
+        return res.status(400).json({
+          status: 1,
+          message: "Message contains inappropriate content",
+        });
+      }
     }
     const token = extractBearerToken(req.headers.authorization);
-    const {userId} = decodeToken(token);
+    const { userId } = decodeToken(token);
     const username = (req as any).user?.username || "Unknown";
     const messageId = await sendMessageService(
       conversation_id,
       userId,
-      filtered_message,
+      content,
       content_type_name || "text",
+      iv,
+      auth_tag
     );
 
     // 2. Prepare payload for socket emission
@@ -79,7 +86,9 @@ export const sendMessage = async (req: Request, res: Response) => {
       conversation_id,
       sender_id: userId,
       sender_name: username,
-      content:filtered_message,
+      content: content,
+      iv: iv,
+      auth_tag: auth_tag,
       content_type: content_type_name || "text",
       created_at: new Date().toISOString(),
     };
@@ -107,8 +116,8 @@ export const sendMessage = async (req: Request, res: Response) => {
 export const markConversationRead = async (req: Request, res: Response) => {
   try {
     const { conversation_id, last_message_id } = req.body as MarkReadRequest;
-     const token = extractBearerToken(req.headers.authorization);
-    const {userId} = decodeToken(token);
+    const token = extractBearerToken(req.headers.authorization);
+    const { userId } = decodeToken(token);
 
 
     await markConversationReadService(
@@ -136,7 +145,7 @@ export const markConversationRead = async (req: Request, res: Response) => {
 export const getUserInbox = async (req: Request, res: Response) => {
   try {
     const token = extractBearerToken(req.headers.authorization);
-    const {userId} = decodeToken(token);
+    const { userId } = decodeToken(token);
 
     const inbox = await getUserInboxService(userId);
 
