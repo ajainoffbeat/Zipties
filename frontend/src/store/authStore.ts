@@ -5,6 +5,7 @@ import { jwtDecode } from "jwt-decode";
 import { useProfileStore } from "./useProfileStore";
 import { useInboxStore } from "./useInboxStore";
 import { useMessageStore } from "./useMessageStore";
+import { connectSocket, disconnectSocket } from "../lib/socket";
 
 type JwtPayload = {
   userId: string;
@@ -31,6 +32,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   setToken: (token) => {
     const decoded = jwtDecode<JwtPayload>(token);
     Cookies.set("token", token, { sameSite: "strict" });
+    connectSocket(token);
 
     set({
       token,
@@ -41,6 +43,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: () => {
     Cookies.remove("token");
+    disconnectSocket();
     useProfileStore.getState().resetProfile();
     useInboxStore.getState().resetInbox();
     useMessageStore.getState().resetMessages();
@@ -56,6 +59,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     try {
       const decoded = jwtDecode<JwtPayload>(token);
+      connectSocket(token);
       set({
         token,
         userId: decoded?.userId,
