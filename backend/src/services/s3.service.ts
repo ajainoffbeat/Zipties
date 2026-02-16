@@ -25,7 +25,6 @@ export const uploadToS3 = async (file: Express.Multer.File) => {
         Bucket: env.AWS_S3_BUCKET_NAME,
         Key: `avatars/${Date.now()}-${file.originalname}`,
         Body: file.buffer,
-        ACL: "public-read",
         ContentType: file.mimetype,
       },
     });
