@@ -246,11 +246,6 @@ export default function EditProfile() {
               <div>
                 <Label>Nickname</Label>
                 <Input {...register("username")} />
-                {errors.username && (
-                  <p className="text-sm text-destructive">
-                    {errors.username.message}
-                  </p>
-                )}
               </div>
 
               <div>
