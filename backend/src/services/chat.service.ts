@@ -49,17 +49,21 @@ export const addConversationMembers = async (
 export const sendMessage = async (
   conversationId: string,
   senderId: string,
-  content: string,
-  contentTypeName: string = 'text'
+  encryptedMessageBase64: string,
+  contentTypeName: string = "text",
+  ivBase64?: string,
+  authTagBase64?: string
 ): Promise<string> => {
-  // 1. Check if any member has blocked the sender or vice-versa
+
+  // 1️⃣ Block check (unchanged)
   const blockCheck = await pool.query(
-    `SELECT 1 
+    `SELECT 1
      FROM conversation_member cm
-     JOIN user_report ur ON 
+     JOIN user_report ur ON
        (ur.user_id = $1 AND ur.blocked_user_id = cm.user_id) OR
        (ur.user_id = cm.user_id AND ur.blocked_user_id = $1)
-     WHERE cm.conversation_id = $2 AND cm.user_id != $1
+     WHERE cm.conversation_id = $2
+       AND cm.user_id != $1
      LIMIT 1`,
     [senderId, conversationId]
   );
@@ -68,12 +72,32 @@ export const sendMessage = async (
     throw new Error("Message blocked: One of the users has blocked the other.");
   }
 
+  // 2️⃣ Call DB function (TEXT, not BYTEA)
   const result = await pool.query(
-    "SELECT fn_send_message($1, $2, $3, $4) as id",
-    [conversationId, senderId, content, contentTypeName]
+    `
+    SELECT fn_send_message(
+      $1::uuid,
+      $2::uuid,
+      $3::text,
+      $4::text,
+      $5::text,
+      $6::text
+    ) AS id;
+    `,
+    [
+      conversationId,
+      senderId,
+      encryptedMessageBase64, // ✅ stored as-is
+      ivBase64 ?? null,
+      authTagBase64 ?? null,
+      contentTypeName
+    ]
   );
+
   return result.rows[0].id;
 };
+
+
 
 /**
  * Mark a conversation as read for a user
@@ -118,20 +142,25 @@ export const getConversationMessages = async (
   offset: number = 0
 ): Promise<any[]> => {
   const result = await pool.query(
-    `SELECT 
+    `
+    SELECT 
       m.id,
       m.sender_id,
-      m.content,
+      m.content,  
       m.created_at,
-      mct.name as content_type,
-      u.username as sender_name
+      mct.name AS content_type,
+      u.username AS sender_name
     FROM message m
-    JOIN message_content_type mct ON m.message_content_type_id = mct.id
-    LEFT JOIN "user" u ON m.sender_id = u.id
+    JOIN message_content_type mct
+      ON m.message_content_type_id = mct.id
+    LEFT JOIN "user" u
+      ON u.id = m.sender_id
     WHERE m.conversation_id = $1
-    ORDER BY m.created_at ASC
-    LIMIT $2 OFFSET $3`,
+    ORDER BY m.created_at DESC  
+    LIMIT $2 OFFSET $3
+    `,
     [conversationId, limit, offset]
   );
+
   return result.rows;
 };
