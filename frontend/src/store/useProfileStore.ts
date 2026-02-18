@@ -78,6 +78,7 @@ export const useProfileStore = create<ProfileState>()(
             bio: data.bio,
             profile_image_url: data.profileImageUrl,
             city_id: data.cityId,
+            city_name: data.cityName,
             interests: data.interests,
             tags: data.tags,
           };
