@@ -278,3 +278,58 @@ export const getPosts = async (limit: number = 20, offset: number = 0): Promise<
     throw error;
   }
 };
+
+export const searchPosts = async (searchQuery: string, limit: number = 20, offset: number = 0): Promise<PostsResponse> => {
+  try {
+    logger.debug('Searching posts', { searchQuery, limit, offset });
+
+    if (!searchQuery || searchQuery.trim().length === 0) {
+      throw new AppError(400, "Search query is required and cannot be empty", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    const result = await pool.query(
+      "SELECT * FROM fn_search_posts($1, $2, $3)",
+      [searchQuery.trim(), limit, offset]
+    );
+
+    const posts: PostResponse[] = result.rows.map(post => ({
+      postId: post.post_id,
+      content: post.content,
+      isBlocked: false, // Already filtered
+      createdAt: post.created_at.toISOString(),
+      updatedAt: null, // Not returned in fn_search_posts
+      user: {
+        userId: post.user_id,
+        firstName: post.user_firstname || '',
+        lastName: post.user_lastname || '',
+        username: post.user_username || ''
+      },
+      assets: post.assets || []
+    }));
+
+    const hasMore = posts.length === limit;
+
+    const response: PostsResponse = {
+      posts,
+      pagination: {
+        limit,
+        offset,
+        hasMore
+      }
+    };
+
+    logger.debug('Posts search completed successfully', { count: posts.length, searchQuery, limit, offset });
+    return response;
+  } catch (error) {
+    logger.error('Failed to search posts', {
+      searchQuery,
+      limit,
+      offset,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    throw error;
+  }
+};

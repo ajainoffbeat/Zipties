@@ -1,6 +1,6 @@
 import type { Response, Request, NextFunction } from "express";
 import { decodeToken, extractBearerToken } from "../utils/jwt.util.js";
-import { createPost, createPostAssets, editPost, deletePost, getPost, getPosts } from "../services/post.service.js";
+import { createPost, createPostAssets, editPost, deletePost, getPost, getPosts, searchPosts } from "../services/post.service.js";
 import { AppError } from "../utils/response/appError.js";
 import { sendSuccess } from "../utils/response/appSuccess.js";
 import { RESPONSE_CODES } from "../constants/responseCode.constant.js";
@@ -302,6 +302,51 @@ export const getPostsController = async (
     });
   } catch (err) {
     logger.error('Error in getPostsController', { error: err });
+    next(err);
+  }
+};
+
+export const searchPostsController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const searchQuery = req.query.q as string;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    if (!searchQuery || searchQuery.trim().length === 0) {
+      throw new AppError(400, "Search query parameter 'q' is required and cannot be empty", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    if (limit < 1 || limit > 100) {
+      throw new AppError(400, "Limit must be between 1 and 100", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    if (offset < 0) {
+      throw new AppError(400, "Offset must be non-negative", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    const postsResponse = await searchPosts(searchQuery.trim(), limit, offset);
+
+    return sendSuccess(res, {
+      status: 200,
+      message: "Posts search completed successfully",
+      ...postsResponse,
+      code: RESPONSE_CODES.SUCCESS,
+    });
+  } catch (err) {
+    logger.error('Error in searchPostsController', { error: err });
     next(err);
   }
 };
