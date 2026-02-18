@@ -8,6 +8,7 @@ import { errorMiddleware } from "./middlewares/error.middleware.js";
 import { rateLimiter } from "./middlewares/rateLimiter.middleware.js";
 import { env } from "./config/env.js";
 import { authMiddleware } from "./middlewares/auth.js";
+import postRoutes from "./routes/post.routes.js";
 
 const RATE_LIMIT_REQ =
   Number.parseInt(env.RATE_LIMIT_REQ ?? "5", 10);
@@ -25,10 +26,12 @@ app.set("trust proxy", true);
 app.use(express.json());
 app.use("/uploads", express.static("public/uploads"));
 app.use(rateLimiter(RATE_LIMIT_REQ, RATE_LIMIT_TIME));
+app.use(express.static('uploads'));
 
 app.use("/api", authRoutes);
 app.use("/api/conversation", authMiddleware, conversationRoutes);
 app.use("/api/user", authMiddleware, userRoutes);
+app.use("/api/posts", authMiddleware, postRoutes);
 app.use(errorLogs);
 app.use(errorMiddleware);
 

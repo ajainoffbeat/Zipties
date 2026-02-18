@@ -1,0 +1,307 @@
+import type { Response, Request, NextFunction } from "express";
+import { decodeToken, extractBearerToken } from "../utils/jwt.util.js";
+import { createPost, createPostAssets, editPost, deletePost, getPost, getPosts } from "../services/post.service.js";
+import { AppError } from "../utils/response/appError.js";
+import { sendSuccess } from "../utils/response/appSuccess.js";
+import { RESPONSE_CODES } from "../constants/responseCode.constant.js";
+import { RESPONSE_MESSAGES } from "../constants/responseMessages.constant.js";
+import { logger } from "../utils/logger.js";
+
+export const createPostController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const token = extractBearerToken(req.headers.authorization);
+
+    const decoded = decodeToken(token);
+
+    if (!decoded || !decoded.userId) {
+      throw new AppError(401, RESPONSE_MESSAGES[RESPONSE_CODES.UNAUTHORIZED], {
+        code: RESPONSE_CODES.UNAUTHORIZED,
+        success: false,
+      });
+    }
+
+    const userId = decoded.userId as string;
+    const { content } = req.body;
+
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      throw new AppError(400, "Content is required and must be a non-empty string", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    if (content.length > 200) {
+      throw new AppError(400, "Content must not exceed 200 characters", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    const postId = await createPost({ userId, content: content.trim() });
+
+    if (!postId) {
+      throw new AppError(500, "Failed to create post", {
+        code: RESPONSE_CODES.INTERNAL_SERVER_ERROR,
+        success: false,
+      });
+    }
+    const files = req.files as Express.Multer.File[];
+    if (files && Array.isArray(files) && files.length > 0) {
+      const assets: Array<{
+        postId: string;
+        filename: string;
+        mimetype: string;
+        size: number;
+        userId: string;
+      }> = files.map((file: Express.Multer.File) => ({
+        postId,
+        filename: file.filename,
+        mimetype: file.mimetype,
+        size: file.size,
+        userId
+      }));
+      await createPostAssets(assets);
+    }
+
+    return sendSuccess(res, {
+      status: 201,
+      message: "Post created successfully",
+      postId,
+      code: RESPONSE_CODES.SUCCESS,
+    });
+  } catch (err) {
+    logger.error('Error in createPostController', { error: err });
+    next(err);
+  }
+};
+
+export const editPostController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+     const token = extractBearerToken(req.headers.authorization);
+
+    const decoded = decodeToken(token);
+
+    if (!decoded || !decoded.userId) {
+      throw new AppError(401, RESPONSE_MESSAGES[RESPONSE_CODES.UNAUTHORIZED], {
+        code: RESPONSE_CODES.UNAUTHORIZED,
+        success: false,
+      });
+    }
+
+    const userId = decoded.userId as string;
+    const postId = req.params.postId as string;
+    const { content, deleteFilesIds: rawDeleteFilesIds } = req.body;
+
+    // Parse deleteFilesIds from form data (comes as string)
+    let deleteFilesIds: string[] | undefined;
+    if (rawDeleteFilesIds) {
+      try {
+        deleteFilesIds = typeof rawDeleteFilesIds === 'string' 
+          ? JSON.parse(rawDeleteFilesIds) 
+          : rawDeleteFilesIds;
+      } catch (e) {
+        throw new AppError(400, "deleteFilesIds must be a valid JSON array", {
+          code: RESPONSE_CODES.BAD_REQUEST,
+          success: false,
+        });
+      }
+    }
+
+    if (!postId) {
+      throw new AppError(400, "Post ID is required", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      throw new AppError(400, "Content is required and must be a non-empty string", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    if (content.length > 200) {
+      throw new AppError(400, "Content must not exceed 200 characters", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    // Validate deleteFilesIds if provided
+    if (deleteFilesIds && (!Array.isArray(deleteFilesIds) || !deleteFilesIds.every(id => typeof id === 'string'))) {
+      throw new AppError(400, "deleteFilesIds must be an array of strings", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+    const files = req.files as Express.Multer.File[];
+    let newAssets: Array<{
+      postId: string;
+      filename: string;
+      mimetype: string;
+      size: number;
+      userId: string;
+    }> | undefined;
+
+    if (files && Array.isArray(files) && files.length > 0) {
+      newAssets = files.map((file: Express.Multer.File) => ({
+        postId,
+        filename: file.filename,
+        mimetype: file.mimetype,
+        size: file.size,
+        userId
+      }));
+    }
+
+    const success = await editPost({
+      postId,
+      userId,
+      content: content.trim(),
+      deleteFilesIds: deleteFilesIds || []
+    }, newAssets);
+ 
+    if (!success) {
+      throw new AppError(404, "Post not found or you don't have permission to edit it", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+  
+    return sendSuccess(res, {
+      status: 200,
+      message: "Post updated successfully",
+      code: RESPONSE_CODES.SUCCESS,
+    });
+  } catch (err) {
+    logger.error('Error in editPostController', { error: err });
+    next(err);
+  }
+};
+export const deletePostController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+     const token = extractBearerToken(req.headers.authorization);
+
+    const decoded = decodeToken(token);
+
+    if (!decoded || !decoded.userId) {
+      throw new AppError(401, RESPONSE_MESSAGES[RESPONSE_CODES.UNAUTHORIZED], {
+        code: RESPONSE_CODES.UNAUTHORIZED,
+        success: false,
+      });
+    }
+
+    const userId = decoded.userId as string;
+    const postId = req.params.postId as string;
+
+    if (!postId) {
+      throw new AppError(400, "Post ID is required", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    const success = await deletePost({ postId, userId });
+
+    if (!success) {
+      throw new AppError(404, "Post not found or you don't have permission to delete it", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    return sendSuccess(res, {
+      status: 200,
+      message: "Post deleted successfully",
+      code: RESPONSE_CODES.SUCCESS,
+    });
+  } catch (err) {
+    logger.error('Error in deletePostController', { error: err });
+    next(err);
+  }
+};
+
+export const getPostController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const postId = req.params.postId as string;
+    if (!postId) {
+      throw new AppError(400, "Post ID is required", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+    
+    const post = await getPost(postId);
+    
+
+    if (!post) {
+      throw new AppError(404, "Post not found", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    return sendSuccess(res, {
+      status: 200,
+      message: "Post retrieved successfully",
+      post,
+      code: RESPONSE_CODES.SUCCESS,
+    });
+  } catch (err) {
+    logger.error('Error in getPostController', { error: err });
+    next(err);
+  }
+};
+
+export const getPostsController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    if (limit < 1 || limit > 100) {
+      throw new AppError(400, "Limit must be between 1 and 100", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    if (offset < 0) {
+      throw new AppError(400, "Offset must be non-negative", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    const postsResponse = await getPosts(limit, offset);
+
+    return sendSuccess(res, {
+      status: 200,
+      message: "Posts retrieved successfully",
+      ...postsResponse,
+      code: RESPONSE_CODES.SUCCESS,
+    });
+  } catch (err) {
+    logger.error('Error in getPostsController', { error: err });
+    next(err);
+  }
+};
