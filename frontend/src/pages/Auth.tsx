@@ -20,6 +20,7 @@ import { setCookie } from "@/utils/cookies";
 import { toast } from "@/hooks/use-toast";
 import { Footer } from "./Footer";
 import { useAuthStore } from "@/store/authStore";
+import { useProfileStore } from "@/store/useProfileStore";
 
 
 export default function Auth() {
@@ -70,8 +71,11 @@ export default function Auth() {
       if (payload.mode === "login") {
         const response = await loginMutation.mutateAsync(payload);
         if (response.data.success === true) {
-          // setCookie("token", response.data.token);
           useAuthStore.getState().setToken(response.data.token);
+          const userId = useAuthStore.getState().userId;
+          if (userId) {
+            await useProfileStore.getState().fetchMyProfile(userId);
+          }
           navigate("/feed");
         }
         else {
@@ -85,8 +89,11 @@ export default function Auth() {
       } else {
         const response = await signupMutation.mutateAsync(payload);
         if (response.data.success === true) {
-          // setCookie("token", response.data.token);
           useAuthStore.getState().setToken(response.data.token);
+          const userId = useAuthStore.getState().userId;
+          if (userId) {
+            await useProfileStore.getState().fetchMyProfile(userId);
+          }
           navigate("/feed");
         }
         else {

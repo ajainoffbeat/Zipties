@@ -1,14 +1,3 @@
---Entry into Subtables
-INSERT INTO public.user_status (id,name,description,is_active)
-VALUES ('c9f1669f-ec39-4694-a268-3eead4ad9f13', 'active','active',true);
-
-
-INSERT INTO public.user_role (id,name,description,is_active)
-VALUES ('2b76a922-2d37-4572-8c0a-50f8e56788b0', 'user','user',true);
-
-INSERT INTO public.user_role (id,name,description,is_active)
-VALUES ('dda065c8-cb99-461b-86b6-572f4ccd9d21', 'admin','admin',true);
-
 
 
 -- Messaging Schema
@@ -55,3 +44,706 @@ INSERT INTO public.city (name, city, country_code, state) VALUES ('Rigby', 'Rigb
 UPDATE city
 SET country_code = 'US';
 
+-- ============================================================================
+-- Function Name : fn_get_or_create_conversation
+-- Purpose       : Gets an existing conversation between specified users or creates
+--                 a new conversation if one doesn't exist. Handles both direct
+--                 (individual) and group conversations with optional source
+--                 tracking for audit purposes.
+-- Author        : OFFBEAT
+-- Created On    : 29/01/2025
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.fn_get_or_create_conversation(
+        p_user_ids UUID [],
+        p_type_name VARCHAR,
+        p_source_type_name VARCHAR DEFAULT NULL,
+        p_source_id UUID DEFAULT NULL,
+        p_created_by UUID DEFAULT NULL
+    ) RETURNS UUID AS $$
+DECLARE v_conversation_id UUID;
+v_type_id UUID;
+v_source_type_id UUID;
+v_is_direct BOOLEAN;
+BEGIN
+SELECT id INTO v_type_id
+FROM conversation_type
+WHERE name = p_type_name;
+IF v_type_id IS NULL THEN RAISE EXCEPTION 'Invalid conversation type: %',
+p_type_name;
+END IF;
+v_is_direct := (p_type_name = 'individual');
+IF v_is_direct
+AND array_length(p_user_ids, 1) = 2 THEN
+SELECT cm1.conversation_id INTO v_conversation_id
+FROM conversation_member cm1
+    JOIN conversation_member cm2 ON cm1.conversation_id = cm2.conversation_id
+    JOIN conversation c ON cm1.conversation_id = c.id
+WHERE c.conversation_type_id = v_type_id
+    AND cm1.user_id = p_user_ids [1]
+    AND cm2.user_id = p_user_ids [2]
+LIMIT 1;
+IF v_conversation_id IS NOT NULL THEN RETURN v_conversation_id;
+END IF;
+END IF;
+IF p_source_type_name IS NOT NULL THEN
+SELECT id INTO v_source_type_id
+FROM conversation_source_type
+WHERE name = p_source_type_name;
+END IF;
+INSERT INTO conversation (
+        conversation_type_id,
+        conversation_source_type_id,
+        source_id,
+        created_by,
+        last_message_at,
+        title
+    )
+VALUES (
+        v_type_id,
+        v_source_type_id,
+        p_source_id,
+        p_created_by,
+        NOW(),
+        CASE
+            WHEN v_is_direct THEN 'Direct Chat'
+            ELSE 'New Conversation'
+        END
+    )
+RETURNING id INTO v_conversation_id;
+INSERT INTO conversation_member (
+        conversation_id,
+        user_id,
+        created_at,
+        unread_count,
+        created_by
+    )
+SELECT v_conversation_id,
+    unnest(p_user_ids),
+    NOW(),
+    0,
+    p_created_by;
+RETURN v_conversation_id;
+END;
+$$ LANGUAGE plpgsql;
+-- ============================================================================
+-- Function Name : fn_mark_conversation_read
+-- Purpose       : Marks a conversation as read for a specific user by resetting
+--                 their unread count and updating the last read message ID.
+--                 Used for tracking read status and notification management.
+-- Author        : OFFBEAT
+-- Created On    : 29/01/2025
+-- ============================================================================
+-- Function: Mark Conversation Read (Step 6)
+CREATE OR REPLACE FUNCTION public.fn_mark_conversation_read(
+        p_conversation_id UUID,
+        p_user_id UUID,
+        p_last_message_id UUID
+    ) RETURNS VOID AS $$ BEGIN
+UPDATE conversation_member
+SET unread_count = 0,
+    last_read_message_id = p_last_message_id,
+    updated_at = NOW()
+WHERE conversation_id = p_conversation_id
+    AND user_id = p_user_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================================================
+-- Function Name : fn_get_user_inbox
+-- Purpose       : Retrieves a user's inbox with conversation details, including
+--                 unread counts, last messages, and block status.
+--                 Used for displaying the user's inbox in the UI.
+-- Author        : OFFBEAT
+-- Created On    : 29/01/2025
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.fn_get_user_inbox(
+	p_user_id uuid)
+    RETURNS TABLE(conversation_id uuid, title character varying, type_name character varying, unread_count integer, last_message_preview text, last_message_at timestamp without time zone, last_message_sender_id uuid, last_message_sender_name text, source_type character varying, source_id uuid, is_blocked boolean, blocked_by uuid, other_user_id uuid, other_user_profile_image_url text) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+ 
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    c.id AS conversation_id,
+ 
+    -- viewer-dependent title (1-to-1 chat)
+    CASE
+      WHEN ct.name = 'individual' THEN
+        COALESCE(
+          NULLIF(TRIM(u_other.firstname || ' ' || u_other.lastname), ''),
+          u_other.username
+        )
+      ELSE
+        c.title
+    END AS title,
+ 
+    ct.name AS type_name,
+    cm.unread_count,
+ 
+    -- 🔐 encrypted chat: never expose message content
+  CASE
+  WHEN block_info.is_blocked THEN NULL
+  ELSE m.content
+END AS last_message_preview,
+ 
+    c.last_message_at,
+    m.sender_id AS last_message_sender_id,
+    u_sender.username::text AS last_message_sender_name,
+    cst.name AS source_type,
+    c.source_id,
+ 
+    COALESCE(block_info.is_blocked, FALSE) AS is_blocked,
+    block_info.blocked_by,
+ 
+    cm_other.user_id AS other_user_id,
+ 
+    -- other user's avatar
+    CASE
+      WHEN block_info.is_blocked THEN NULL
+      ELSE u_other.profile_image_url
+    END AS other_user_profile_image_url
+ 
+  FROM conversation_member cm
+  JOIN conversation c
+    ON cm.conversation_id = c.id
+  JOIN conversation_type ct
+    ON c.conversation_type_id = ct.id
+ 
+  JOIN conversation_member cm_other
+    ON cm_other.conversation_id = c.id
+   AND cm_other.user_id <> p_user_id
+ 
+  JOIN public."user" u_other
+    ON u_other.id = cm_other.user_id
+ 
+  LEFT JOIN conversation_source_type cst
+    ON c.conversation_source_type_id = cst.id
+ 
+  -- last message (ONLY metadata)
+LEFT JOIN LATERAL (
+  SELECT
+    m2.sender_id,
+    m2.content
+  FROM message m2
+  WHERE m2.conversation_id = c.id
+  ORDER BY m2.created_at DESC
+  LIMIT 1
+) m ON TRUE
+ 
+  LEFT JOIN public."user" u_sender
+    ON u_sender.id = m.sender_id
+ 
+  -- block info
+  LEFT JOIN LATERAL (
+    SELECT
+      TRUE AS is_blocked,
+      ur.user_id AS blocked_by
+    FROM user_report ur
+    WHERE (
+      ur.user_id = p_user_id
+      AND ur.blocked_user_id = cm_other.user_id
+    )
+    OR (
+      ur.user_id = cm_other.user_id
+      AND ur.blocked_user_id = p_user_id
+    )
+    LIMIT 1
+  ) block_info ON TRUE
+ 
+  WHERE cm.user_id = p_user_id
+  ORDER BY c.last_message_at DESC NULLS LAST;
+END;
+$$;
+-- ============================================================================
+-- Function Name : fn_update_unread_counts
+-- Purpose       : Increments unread message count for all conversation members
+--                 except the sender. Called after sending a new message to
+--                 track unread notifications for other participants.
+-- Author        : OFFBEAT
+-- Created On    : 29/01/2025
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.fn_update_unread_counts(
+        p_conversation_id UUID,
+        p_sender_id UUID
+    ) RETURNS VOID AS $$ BEGIN
+UPDATE conversation_member
+SET unread_count = unread_count + 1
+WHERE conversation_id = p_conversation_id
+    AND user_id != p_sender_id;
+END;
+$$ LANGUAGE plpgsql;
+-- ============================================================================
+-- Function Name : fn_update_last_message_at
+-- Purpose       : Updates the last message timestamp for a conversation.
+--                 Used for sorting conversations by recent activity and
+--                 maintaining conversation ordering in user interfaces.
+-- Author        : OFFBEAT
+-- Created On    : 29/01/2025
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.fn_update_last_message_at(
+        p_conversation_id UUID,
+        p_timestamp TIMESTAMP
+    ) RETURNS VOID AS $$ BEGIN
+UPDATE conversation
+SET last_message_at = p_timestamp
+WHERE id = p_conversation_id;
+END;
+$$ LANGUAGE plpgsql;
+-- ============================================================================
+-- Function Name : fn_send_message
+-- Purpose       : Sends a message to a conversation with content validation and
+--                 block checking. Updates conversation timestamps and unread
+--                 counts. Supports different content types for rich messaging.
+-- Author        : OFFBEAT
+-- Created On    : 29/01/2025
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.fn_send_message(
+        p_conversation_id uuid,
+        p_sender_id uuid,
+        p_content text,
+        p_iv text,
+        p_auth_tag text,
+        p_content_type text
+    ) RETURNS uuid LANGUAGE 'plpgsql' COST 100 VOLATILE PARALLEL UNSAFE AS $$
+DECLARE v_message_id uuid;
+v_message_content_type_id uuid;
+BEGIN -- resolve message content type
+SELECT id INTO v_message_content_type_id
+FROM public.message_content_type
+WHERE name = p_content_type
+LIMIT 1;
+IF v_message_content_type_id IS NULL THEN RAISE EXCEPTION 'Invalid message content type: %',
+p_content_type;
+END IF;
+INSERT INTO public.message (
+        conversation_id,
+        sender_id,
+        content,
+        message_content_type_id,
+        created_by,
+        created_at
+    )
+VALUES (
+        p_conversation_id,
+        p_sender_id,
+        p_content,
+        -- ✅ encrypted Base64 here
+        v_message_content_type_id,
+        p_sender_id,
+        NOW()
+    )
+RETURNING id INTO v_message_id;
+RETURN v_message_id;
+END;
+$$;
+-- ============================================================================
+-- Function Name : fn_update_user_socket
+-- Purpose       : Updates a user's socket connection ID and timestamp for
+--                 real-time messaging. Used to track active connections and
+--                 enable instant message delivery via WebSocket.
+-- Author        : OFFBEAT
+-- Created On    : 29/01/2025
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.fn_update_user_socket(p_user_id UUID, p_socket_id VARCHAR) RETURNS VOID AS $$ BEGIN
+UPDATE "user"
+SET socket_id = p_socket_id,
+    socket_connected_at = NOW()
+WHERE id = p_user_id;
+END;
+$$ LANGUAGE plpgsql;
+-- ============================================================================
+-- Function Name : fn_clear_user_socket
+-- Purpose       : Clears a user's socket connection when they disconnect.
+--                 Removes socket ID and connection timestamp to mark user
+--                 as offline for real-time messaging system.
+-- Author        : OFFBEAT
+-- Created On    : 29/01/2025
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.fn_clear_user_socket(p_socket_id VARCHAR) RETURNS VOID AS $$ BEGIN
+UPDATE "user"
+SET socket_id = NULL,
+    socket_connected_at = NULL
+WHERE socket_id = p_socket_id;
+END;
+$$ LANGUAGE plpgsql;
+-- ============================================================================
+-- Function Name : fn_get_conversation_sockets
+-- Purpose       : Retrieves socket connection details for all active users in
+--                 a conversation except the sender. Used for real-time message
+--                 broadcasting to connected participants in chat.
+-- Author        : OFFBEAT
+-- Created On    : 29/01/2025
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.fn_get_conversation_sockets(
+        p_conversation_id UUID,
+        p_sender_id UUID
+    ) RETURNS TABLE (
+        user_id UUID,
+        socket_id VARCHAR,
+        username TEXT
+    ) AS $$ BEGIN RETURN QUERY
+SELECT u.id AS user_id,
+    u.socket_id,
+    u.username::TEXT
+FROM conversation_member cm
+    JOIN "user" u ON u.id = cm.user_id
+WHERE cm.conversation_id = p_conversation_id
+    AND cm.user_id != p_sender_id
+    AND u.socket_id IS NOT NULL;
+END;
+$$ LANGUAGE plpgsql;
+-- ============================================================================
+-- Function Name : fn_get_user_by_socket
+-- Purpose       : Retrieves user details by socket connection ID. Used to
+--                 identify connected users for real-time messaging and
+--                 authentication of WebSocket connections.
+-- Author        : OFFBEAT
+-- Created On    : 29/01/2025
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.fn_get_user_by_socket(p_socket_id VARCHAR) RETURNS TABLE (
+        user_id UUID,
+        username TEXT,
+        email TEXT
+    ) AS $$ BEGIN RETURN QUERY
+SELECT u.id AS user_id,
+    u.username::TEXT,
+    u.email::TEXT
+FROM "user" u
+WHERE u.socket_id = p_socket_id;
+END;
+$$ LANGUAGE plpgsql;
+-- ============================================================================
+-- Function Name : fn_add_conversation_members
+-- Purpose       : Adds multiple users to an existing conversation as members.
+--                 Prevents duplicate entries and initializes unread counts.
+--                 Used for group chat management and conversation expansion.
+-- Author        : OFFBEAT
+-- Created On    : 29/01/2025
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.fn_add_conversation_members(
+        p_conversation_id UUID,
+        p_user_ids UUID []
+    ) RETURNS VOID AS $$ BEGIN
+INSERT INTO conversation_member (
+        conversation_id,
+        user_id,
+        created_at,
+        unread_count
+    )
+SELECT p_conversation_id,
+    u_id,
+    NOW(),
+    0
+FROM unnest(p_user_ids) AS u_id
+WHERE NOT EXISTS (
+        SELECT 1
+        FROM conversation_member
+        WHERE conversation_id = p_conversation_id
+            AND user_id = u_id
+    );
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- ============================================================================
+-- Function Name : fn_get_user_profile
+-- Purpose       : Fetches a user's profile information with blocking status.
+--                 Returns user profile data and indicates if the current user
+--                 has blocked the requested user or vice versa.
+-- Author        : OFFBEAT
+-- Created On    : 29/01/2025
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.fn_get_user_profile(
+    p_current_user_id uuid,
+    p_user_id uuid
+)
+RETURNS TABLE(
+    id uuid,
+    first_name text,
+    last_name text,
+    username text,
+    email text,
+    bio text,
+    city_id uuid,
+    city_name text,
+    interests text,
+    tags text,
+    profile_image_url text,
+    joined_date timestamp without time zone,
+    isblocked boolean
+)
+LANGUAGE sql
+STABLE
+AS
+$$
+SELECT 
+    u.id,
+    u.firstname AS first_name,
+    u.lastname AS last_name,
+    u.username,
+    u.email,
+    u.bio,
+    u.city_id,
+    c.name AS city_name,
+    u.interests,
+    u.tags,
+    u.profile_image_url,
+    u.created_at AS joined_date,
+    (ur.blocked_user_id IS NOT NULL) AS isblocked
+FROM "user" u
+LEFT JOIN city c 
+    ON c.id = u.city_id
+LEFT JOIN user_report ur 
+    ON ur.blocked_user_id = u.id 
+    AND ur.user_id = p_current_user_id
+WHERE u.id = p_user_id
+    AND u.is_blocked = false
+    AND u.is_active = true;
+$$;
+
+-- ============================================================================
+-- Function Name : fn_update_user
+-- Purpose       : Updates a user's profile information.
+--                 This function is primarily used during login to retrieve
+--                 the user ID and hashed password.
+-- Author        : OFFBEAT
+-- Created On    : 29/01/2025
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.fn_update_user(
+        p_user_id uuid,
+        p_firstname character varying DEFAULT NULL::character varying,
+        p_lastname character varying DEFAULT NULL::character varying,
+        p_username character varying DEFAULT NULL::character varying,
+        p_bio character varying DEFAULT NULL::character varying,
+        p_profile_image_url character varying DEFAULT NULL::character varying,
+        p_updated_by uuid DEFAULT NULL::uuid,
+        p_city_id uuid DEFAULT NULL::uuid,
+        p_interests text DEFAULT NULL::text,
+        p_tags text DEFAULT NULL::text
+    ) RETURNS boolean LANGUAGE 'plpgsql' COST 100 VOLATILE PARALLEL UNSAFE AS $$ BEGIN
+UPDATE "user"
+SET firstname = COALESCE(p_firstname, firstname),
+    lastname = COALESCE(p_lastname, lastname),
+    username = COALESCE(p_username, username),
+    bio = COALESCE(p_bio, bio),
+    profile_image_url = COALESCE(p_profile_image_url, profile_image_url),
+    updated_by = COALESCE(p_updated_by, updated_by),
+    updated_at = NOW(),
+    city_id = COALESCE(p_city_id, city_id),
+    interests = COALESCE(p_interests, interests),
+    tags = COALESCE(p_tags, tags)
+WHERE id = p_user_id;
+RETURN FOUND;
+END;
+$$;
+-- ============================================================================
+-- Function Name : fn_block_user
+-- Purpose       : Blocks a user from interacting with another user. Creates a
+--                 block record to prevent messaging and other interactions.
+--                 Includes validation to prevent self-blocking and duplicates.
+-- Author        : OFFBEAT
+-- Created On    : 29/01/2025
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.fn_block_user(
+        p_user_id UUID,
+        p_blocked_user_id UUID,
+        p_comment VARCHAR DEFAULT NULL
+    ) RETURNS TABLE (success BOOLEAN, message TEXT) LANGUAGE plpgsql AS $$ BEGIN IF p_user_id IS NULL
+    OR p_blocked_user_id IS NULL THEN RETURN QUERY
+SELECT FALSE,
+    'user_id and blocked_user_id are required';
+RETURN;
+END IF;
+IF p_user_id = p_blocked_user_id THEN RETURN QUERY
+SELECT FALSE,
+    'User cannot block themselves';
+RETURN;
+END IF;
+IF EXISTS (
+    SELECT 1
+    FROM user_report
+    WHERE user_id = p_user_id
+        AND blocked_user_id = p_blocked_user_id
+) THEN RETURN QUERY
+SELECT FALSE,
+    'User already blocked';
+RETURN;
+END IF;
+INSERT INTO user_report (
+        id,
+        user_id,
+        comment,
+        blocked_user_id,
+        created_by,
+        created_at
+    )
+VALUES (
+        gen_random_uuid(),
+        p_user_id,
+        p_comment,
+        p_blocked_user_id,
+        p_user_id,
+        NOW()
+    );
+RETURN QUERY
+SELECT TRUE,
+    'User blocked successfully';
+EXCEPTION
+WHEN OTHERS THEN RETURN QUERY
+SELECT FALSE,
+    'Error occurred while blocking user';
+END;
+$$;
+-- ============================================================================
+-- Function Name : fn_unblock_user
+-- Purpose       : Removes a block between users, allowing them to interact
+--                 again. Deletes the block record and validates the operation
+--                 to ensure proper unblocking with error handling.
+-- Author        : OFFBEAT
+-- Created On    : 29/01/2025
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.fn_unblock_user(
+        p_user_id UUID,
+        p_blocked_user_id UUID
+    ) RETURNS TABLE (success BOOLEAN, message TEXT) LANGUAGE plpgsql AS $$ BEGIN IF p_user_id IS NULL
+    OR p_blocked_user_id IS NULL THEN RETURN QUERY
+SELECT FALSE,
+    'user_id and blocked_user_id are required';
+RETURN;
+END IF;
+IF p_user_id = p_blocked_user_id THEN RETURN QUERY
+SELECT FALSE,
+    'Invalid operation';
+RETURN;
+END IF;
+IF NOT EXISTS (
+    SELECT 1
+    FROM user_report
+    WHERE user_id = p_user_id
+        AND blocked_user_id = p_blocked_user_id
+) THEN RETURN QUERY
+SELECT FALSE,
+    'Block record not found';
+RETURN;
+END IF;
+DELETE FROM user_report
+WHERE user_id = p_user_id
+    AND blocked_user_id = p_blocked_user_id;
+RETURN QUERY
+SELECT TRUE,
+    'User unblocked successfully';
+EXCEPTION
+WHEN OTHERS THEN RETURN QUERY
+SELECT FALSE,
+    'Error occurred while unblocking user';
+END;
+$$;
+-- ============================================================================
+-- Function Name : fn_get_cities
+-- Purpose       : Fetches cities based on country code and optional state filter.
+--                 This function retrieves active cities with pagination support,
+--                 ordered by city name. Used for populating city selection dropdowns
+--                 and location-based searches.
+-- Author        : OFFBEAT
+-- Created On    : 29/01/2025
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.fn_get_cities(
+        p_country_code character varying,
+        p_state character varying DEFAULT NULL,
+        p_search character varying DEFAULT NULL,
+        p_limit integer DEFAULT 50,
+        p_offset integer DEFAULT 0
+    ) RETURNS TABLE (
+        id uuid,
+        name character varying(100),
+        city character varying(100),
+        state character varying(100)
+    ) LANGUAGE plpgsql VOLATILE AS $$ BEGIN RETURN QUERY
+SELECT c.id,
+    c.name,
+    c.city,
+    c.state
+FROM city c
+WHERE c.country_code = p_country_code
+    AND c.is_active = true
+    AND (
+        NULLIF(TRIM(p_state), '') IS NULL
+        OR c.state ILIKE '%' || TRIM(p_state) || '%'
+    )
+    AND (
+        NULLIF(TRIM(p_search), '') IS NULL
+        OR c.city ILIKE '%' || TRIM(p_search) || '%'
+        OR c.name ILIKE '%' || TRIM(p_search) || '%'
+    )
+ORDER BY c.city
+LIMIT p_limit OFFSET p_offset;
+END;
+$$;
+
+-- ============================================================================
+-- Function Name : fn_is_user_blocked
+-- Purpose       : Checks if a user has blocked another user.
+-- Author        : OFFBEAT
+-- Created On    : 11/02/2025
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.fn_is_user_blocked(
+    p_user_id uuid,
+    p_current_user_id uuid
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+AS $$
+    SELECT EXISTS (
+        SELECT 1
+        FROM user_report ur
+        WHERE ur.user_id = p_user_id
+          AND ur.blocked_user_id = p_current_user_id
+    );
+$$;
+
+-- ============================================================================
+-- Function Name : fn_search_users_by_name
+-- Purpose       : Searches for users by first name, last name, or username.
+--                 Filters out blocked users for both the searcher and searched.
+-- Author        : OFFBEAT
+-- Created On    : 11/02/2025
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.fn_search_users_by_name(
+    p_query character varying,
+    p_current_user_id uuid
+)
+RETURNS TABLE(
+    id uuid,
+    first_name text,
+    last_name text,
+    username character varying,
+    profile_image_url text
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT u.id,
+        u.firstname::text AS first_name,
+        u.lastname::text AS last_name,
+        u.username,
+        u.profile_image_url::text AS profile_image_url
+    FROM "user" u
+    WHERE (
+            u.firstname ILIKE '%' || p_query || '%'
+            OR u.lastname ILIKE '%' || p_query || '%'
+            OR u.username ILIKE '%' || p_query || '%'
+        )
+        AND u.id != p_current_user_id
+        AND NOT public.fn_is_user_blocked(u.id, p_current_user_id)
+    LIMIT 10;
+END;
+$$;
+
+ALTER TABLE public.user
+ALTER COLUMN profile_image_url TYPE text;

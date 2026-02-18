@@ -45,6 +45,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     Cookies.remove("token");
     disconnectSocket();
     useProfileStore.getState().resetProfile();
+    localStorage.removeItem("profile-storage");
     useInboxStore.getState().resetInbox();
     useMessageStore.getState().resetMessages();
     set({ token: null, userId: null, isInitialized: true });

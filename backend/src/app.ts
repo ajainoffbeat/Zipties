@@ -17,14 +17,14 @@ const app: Application = express();
 
 app.use(
   cors({
-    origin: ["http://localhost:8080", "http://localhost:8081"],
+    origin: ["http://zipties-frontend-bucket.s3-website-us-east-1.amazonaws.com", "http://localhost:8080", "http://localhost:5173"],
     credentials: true,
   })
 );
 app.set("trust proxy", true);
 app.use(express.json());
 app.use("/uploads", express.static("public/uploads"));
-// app.use(rateLimiter(RATE_LIMIT_REQ, RATE_LIMIT_TIME));
+app.use(rateLimiter(RATE_LIMIT_REQ, RATE_LIMIT_TIME));
 
 app.use("/api", authRoutes);
 app.use("/api/conversation", authMiddleware, conversationRoutes);

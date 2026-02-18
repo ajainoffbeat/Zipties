@@ -1,5 +1,5 @@
 import { pool } from "../config/db.js";
-
+ 
 /**
  * Get or create a conversation between users
  * @param userIds - Array of user UUIDs
@@ -22,7 +22,7 @@ export const getOrCreateConversation = async (
   );
   return result.rows[0].id;
 };
-
+ 
 /**
  * Add members to an existing conversation
  * @param conversationId - UUID of conversation
@@ -37,7 +37,7 @@ export const addConversationMembers = async (
     [conversationId, userIds]
   );
 };
-
+ 
 /**
  * Send a message in a conversation
  * @param conversationId - UUID of conversation
@@ -54,25 +54,8 @@ export const sendMessage = async (
   ivBase64?: string,
   authTagBase64?: string
 ): Promise<string> => {
-
-  // 1️⃣ Block check (unchanged)
-  const blockCheck = await pool.query(
-    `SELECT 1
-     FROM conversation_member cm
-     JOIN user_report ur ON
-       (ur.user_id = $1 AND ur.blocked_user_id = cm.user_id) OR
-       (ur.user_id = cm.user_id AND ur.blocked_user_id = $1)
-     WHERE cm.conversation_id = $2
-       AND cm.user_id != $1
-     LIMIT 1`,
-    [senderId, conversationId]
-  );
-
-  if (blockCheck.rowCount && blockCheck.rowCount > 0) {
-    throw new Error("Message blocked: One of the users has blocked the other.");
-  }
-
-  // 2️⃣ Call DB function (TEXT, not BYTEA)
+ 
+  // Call DB function (TEXT, not BYTEA)
   const result = await pool.query(
     `
     SELECT fn_send_message(
@@ -93,12 +76,12 @@ export const sendMessage = async (
       contentTypeName
     ]
   );
-
+ 
   return result.rows[0].id;
 };
-
-
-
+ 
+ 
+ 
 /**
  * Mark a conversation as read for a user
  * @param conversationId - UUID of conversation
@@ -115,7 +98,7 @@ export const markConversationRead = async (
     [conversationId, userId, lastMessageId]
   );
 };
-
+ 
 /**
  * Get inbox for a user
  * @param userId - UUID of user
@@ -128,7 +111,7 @@ export const getUserInbox = async (userId: string): Promise<any[]> => {
   );
   return result.rows;
 };
-
+ 
 /**
  * Get messages for a conversation (helper function)
  * @param conversationId - UUID of conversation
@@ -142,25 +125,9 @@ export const getConversationMessages = async (
   offset: number = 0
 ): Promise<any[]> => {
   const result = await pool.query(
-    `
-    SELECT 
-      m.id,
-      m.sender_id,
-      m.content,  
-      m.created_at,
-      mct.name AS content_type,
-      u.username AS sender_name
-    FROM message m
-    JOIN message_content_type mct
-      ON m.message_content_type_id = mct.id
-    LEFT JOIN "user" u
-      ON u.id = m.sender_id
-    WHERE m.conversation_id = $1
-    ORDER BY m.created_at DESC  
-    LIMIT $2 OFFSET $3
-    `,
+    "SELECT * FROM fn_get_conversation_messages($1, $2, $3)",
     [conversationId, limit, offset]
   );
-
+ 
   return result.rows;
 };

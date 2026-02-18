@@ -1,9 +1,9 @@
 import type { BlockUserResponse } from "../@types/block.types.js";
-import type { 
-  UserProfileData, 
-  UserProfile, 
-  City, 
-  UserSearchResult 
+import type {
+  UserProfileData,
+  UserProfile,
+  City,
+  UserSearchResult
 } from "../@types/user.types.js";
 import { AppError } from "../utils/response/appError.js";
 import { RESPONSE_CODES } from "../constants/responseCode.constant.js";
@@ -14,7 +14,7 @@ export const userProfile = async (
   currentUserId: string,
   userId: string
 ): Promise<UserProfile | null> => {
-  
+
   try {
     const result = await pool.query(
       `SELECT * FROM fn_get_user_profile($1, $2)`,
@@ -32,25 +32,24 @@ export const updateUserProfile = async (
   profileData: UserProfileData
 ): Promise<boolean> => {
   try {
-    console.log(profileData);
     const result = await pool.query(
       `SELECT fn_update_user(
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
       ) AS success`,
       [
         userId,
-        profileData.firstName || null,
-        profileData.lastName || null,
+        profileData.first_name || null,
+        profileData.last_name || null,
         profileData.username || null,
         profileData.bio || null,
         profileData.profile_image_url || null,
         userId,
-        profileData.cityId || null,
+        profileData.city_id || null,
         profileData.interests || null,
         profileData.tags || null,
       ]
     );
-    
+
     logger.info('User profile updated successfully', { userId }, userId);
     return result.rows[0]?.success === true;
   } catch (err) {
@@ -67,7 +66,6 @@ export const getUsCities = async (
   offset = 0
 ): Promise<City[]> => {
   try {
-    console.log(countryCode, state, search, limit, offset)
     const result = await pool.query(
       `SELECT * FROM fn_get_cities($1, $2, $3, $4, $5)`,
       [
@@ -78,7 +76,7 @@ export const getUsCities = async (
         offset
       ]
     );
-    
+
     logger.debug('Cities fetched successfully', { countryCode, search, state, limit, offset, count: result.rows.length });
     return result.rows || [];
   } catch (err) {
@@ -88,19 +86,19 @@ export const getUsCities = async (
 };
 
 export const searchUsersByName = async (query: string, currentUserId: string): Promise<UserSearchResult[]> => {
-  
+
   if (!query || query.trim().length < 2) {
     return [];
   }
-  
+
   try {
-      const result = await pool.query(
-    `SELECT * FROM fn_search_users_by_name($1, $2)`,
-    [query, currentUserId]
-  );
-    
+    const result = await pool.query(
+      `SELECT * FROM fn_search_users_by_name($1, $2)`,
+      [query, currentUserId]
+    );
+
     logger.debug('User search completed', { query, currentUserId, count: result.rows.length }, currentUserId);
-      return result.rows || [];
+    return result.rows || [];
   } catch (error) {
     logger.error('Error searching users by name', { query, currentUserId, error }, currentUserId);
     throw error;

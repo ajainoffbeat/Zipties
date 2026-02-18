@@ -18,7 +18,7 @@ export const logErrorToDB = async ({
 }: LogErrorInput): Promise<void> => {
   try {
     await pool.query(
-      `SELECT fn_log_error($1, $2, $3, $4, $5)`,
+      `SELECT log_error($1, $2, $3, $4, $5)`,
       [
         action,
         requestData.slice(0, 500),

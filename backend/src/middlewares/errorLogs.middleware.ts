@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import { logErrorToDB } from "../services/errorLogger.service.js";
 import { decodeToken, extractBearerToken } from "../utils/jwt.util.js";
 import { logger } from "../utils/logger.js";
+import { EmailService } from "../services/email.service.js";
 
 export const errorLogs = async (
   err: unknown,
@@ -20,7 +21,7 @@ export const errorLogs = async (
         query: req.query,
         body: { ...req.body, password: undefined },
       });
-      // await EmailService.sendExceptionEmail(err.message, action,err.stack?? "N\A");
+      await EmailService.sendExceptionEmail(err.message, action,err.stack?? "N\A");
       await logErrorToDB({
         action,
         requestData,

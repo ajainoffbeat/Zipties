@@ -83,10 +83,10 @@ export function Navbar() {
   );
 
   useEffect(() => {
-    if (userId) {
+    if (userId && !profile) {
       fetchMyProfile(userId);
     }
-  }, [userId, fetchMyProfile]);
+  }, [userId, profile, fetchMyProfile]);
 
 
   useEffect(() => {
@@ -217,7 +217,7 @@ export function Navbar() {
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 overflow-hidden ring-offset-background transition-all hover:ring-2 hover:ring-primary/20">
                   <Avatar className="h-10 w-10 border border-border">
                     <AvatarImage src={profile?.profile_image_url} />
-                    <AvatarFallback className="bg-primary/5 text-primary font-medium">
+                    <AvatarFallback className="text-primary font-medium">
                       {(profile?.first_name?.[0] || "") + (profile?.last_name?.[0] || "") || <User className="h-5 w-5" />}
                     </AvatarFallback>
                   </Avatar>

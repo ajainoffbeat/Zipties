@@ -13,7 +13,7 @@ export const errorMiddleware = (
 
   if (err instanceof AppError) {
     error = err;
-  } else {
+    } else {
     logger.error("Unhandled error", { error: err });
     error = new AppError(500, "Internal Server Error", {
       success: false,

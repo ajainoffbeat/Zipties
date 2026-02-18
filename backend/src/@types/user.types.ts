@@ -1,10 +1,10 @@
 export interface UserProfileData {
-  firstName?: string;
-  lastName?: string;
+  first_name?: string;
+  last_name?: string;
   username?: string;
   bio?: string;
   profile_image_url?: string;
-  cityId?: string;
+  city_id?: string;
   interests?: string;
   tags?: string;
 }

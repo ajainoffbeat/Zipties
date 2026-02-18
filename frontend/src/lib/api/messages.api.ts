@@ -16,8 +16,7 @@ export const sendMessageApi = async (payload: {
     ...payload,
     content_type_name: payload.content_type_name ?? "text",
   });
-
-  return res.data.data;
+  return res.data;
 };
 
 export const getConversationMessages = async (

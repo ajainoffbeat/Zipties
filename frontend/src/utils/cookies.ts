@@ -3,9 +3,9 @@ import Cookies from "js-cookie";
 
 const DEFAULT_OPTIONS = {
   path: "/",
-  expires: 7,         
+  expires: 7,
   sameSite: "lax" as const,
-  secure: import.meta.env.PROD, 
+  secure: false,
 };
 
 export const setCookie = (

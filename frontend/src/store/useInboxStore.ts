@@ -25,6 +25,9 @@ interface InboxState {
   setSelectedConvo: (convo: Conversation) => void;
   updateConversation: (convoId: string, payload: Partial<Conversation>) => void;
   incrementUnreadCount: (convoId: string) => void;
+  addConversation: (convo: Conversation) => void;
+  refreshId: number;
+  triggerRefresh: () => void;
   resetInbox: () => void;
 }
 
@@ -32,13 +35,16 @@ export const useInboxStore = create<InboxState>()(
   devtools((set) => ({
     conversations: [],
     selectedConvo: null,
+    refreshId: 0,
 
-    resetInbox: () => set({ conversations: [], selectedConvo: null }),
+    resetInbox: () => set({ conversations: [], selectedConvo: null, refreshId: 0 }),
 
     setConversations: (data) =>
       set({
         conversations: data,
       }),
+
+    triggerRefresh: () => set((state) => ({ refreshId: state.refreshId + 1 })),
 
     setSelectedConvo: (convo) =>
       set({ selectedConvo: convo }),
@@ -56,6 +62,15 @@ export const useInboxStore = create<InboxState>()(
           c.id === convoId ? { ...c, unread: (c.unread || 0) + 1 } : c
         ),
       })),
+
+    addConversation: (convo) =>
+      set((state) => {
+        const exists = state.conversations.find((c) => c.id === convo.id);
+        if (exists) return state;
+        return {
+          conversations: [convo, ...state.conversations],
+        };
+      }),
   }))
 );
 

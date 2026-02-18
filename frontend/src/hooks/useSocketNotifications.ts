@@ -11,7 +11,7 @@ import { decryptMessage } from "@/lib/encryption";
  * It listens for "new_message" events and updates the internal stores accordingly.
  */
 export const useSocketNotifications = () => {
-    const { incrementUnreadCount, selectedConvo, updateConversation } = useInboxStore();
+    const { incrementUnreadCount, selectedConvo, updateConversation, conversations, triggerRefresh } = useInboxStore();
     const { addMessage } = useMessageStore();
     const userId = useAuthStore((s) => s.userId);
 
@@ -19,6 +19,12 @@ export const useSocketNotifications = () => {
         const isFromMe = String(payload.sender_id) === String(userId);
         const isCurrentConvo = payload.conversation_id === selectedConvo?.id;
         const formattedTime = formatMessageTime(payload.created_at);
+
+        // If the conversation is not in the inbox list, refresh it
+        const convoExists = conversations.some(c => c.id === payload.conversation_id);
+        if (!convoExists) {
+            triggerRefresh();
+        }
 
         const decryptedContent = await decryptMessage(
             payload.content,

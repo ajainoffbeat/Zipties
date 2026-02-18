@@ -1,0 +1,75 @@
+{
+  "family": "zipties-backend-task",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::610249908725:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::610249908725:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "backend",
+      "image": "610249908725.dkr.ecr.us-east-1.amazonaws.com/backend:placeholder",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "NODE_ENV", "value": "production" },
+        { "name": "RATE_LIMIT_TIME", "value": "60" },
+        { "name": "RATE_LIMIT_REQ", "value": "10" },
+        { "name": "FRONTEND_URL", "value": "http://zipties-frontend-bucket.s3-website-us-east-1.amazonaws.com" },
+        { "name": "JWT_EXPIRES_IN", "value": "1d" }
+      ],
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:610249908725:secret:db_connection_string-CUgrIJ"
+        },
+         {
+          "name": "GMAIL_USER",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:610249908725:secret:GMAIL_USER-I2XBrB"
+        },
+         {
+          "name": "GMAIL_SERVICE_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:610249908725:secret:GMAIL_SERVICE_PASSWORD-ufOeoS"
+        },
+         {
+          "name": "ERROR_EMAIL_TO",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:610249908725:secret:ERROR_EMAIL_TO-0Q0ccz"
+        },
+         {
+          "name": "JWT_SECRET",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:610249908725:secret:JWT_SECRET-7dmZ3F"
+        },
+         {
+          "name": "AWS_ACCESS_KEY_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:610249908725:secret:AWS_ACCESS_KEY_ID-ZCjXgn"
+        },
+         {
+          "name": "AWS_SECRET_ACCESS_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:610249908725:secret:AWS_SECRET_ACCESS_KEY-fvDOo2"
+        },
+         {
+          "name": "AWS_S3_REGION",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:610249908725:secret:AWS_S3_REGION-RnrEm4"
+        },
+         {
+          "name": "AWS_S3_BUCKET_NAME",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:610249908725:secret:AWS_S3_BUCKET_NAME-QPICZO"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/backend",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

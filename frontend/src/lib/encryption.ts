@@ -1,47 +1,48 @@
 
+import forge from "node-forge";
+
 const SALT = new TextEncoder().encode("zipties-default-salt-123");
 const SHARED_SECRET = "zipties-conversation-shared-secret";
 
-const getEncryptionKey = async (secret: string): Promise<CryptoKey> => {
-    const encoder = new TextEncoder();
-    const baseKey = await crypto.subtle.importKey(
-        "raw",
-        encoder.encode(secret),
-        "PBKDF2",
-        false,
-        ["deriveKey"]
-    );
 
-    return crypto.subtle.deriveKey(
-        {
-            name: "PBKDF2",
-            salt: SALT,
-            iterations: 100000,
-            hash: "SHA-256",
-        },
-        baseKey,
-        { name: "AES-GCM", length: 256 },
-        false,
-        ["encrypt", "decrypt"]
-    );
+// Derive 256-bit key using PBKDF2
+let cachedKey: forge.Bytes | null = null;
+
+const getEncryptionKey = (secret: string) => {
+  if (cachedKey) return cachedKey;
+
+  cachedKey = forge.pkcs5.pbkdf2(
+    secret,
+    SALT,
+    100000,
+    32,
+    forge.md.sha256.create()
+  );
+  return cachedKey;
 };
 
 export const encryptMessage = async (message: string): Promise<string> => {
-  const key = await getEncryptionKey(SHARED_SECRET);
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encoded = new TextEncoder().encode(message);
+  const key = getEncryptionKey(SHARED_SECRET);
 
-  const encrypted = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
-    key,
-    encoded
-  );
+  // 12-byte IV for GCM
+  const iv = forge.random.getBytesSync(12);
 
-  const combined = new Uint8Array(iv.length + encrypted.byteLength);
-  combined.set(iv, 0);
-  combined.set(new Uint8Array(encrypted), iv.length);
+  const cipher = forge.cipher.createCipher("AES-GCM", key);
+  cipher.start({
+    iv,
+    tagLength: 128,
+  });
 
-  return btoa(String.fromCharCode(...combined));
+  cipher.update(forge.util.createBuffer(message, "utf8"));
+  cipher.finish();
+
+  const ciphertext = cipher.output.getBytes();
+  const tag = cipher.mode.tag.getBytes();
+
+  // Combine IV + ciphertext + tag
+  const combined = iv + ciphertext + tag;
+
+  return forge.util.encode64(combined);
 };
 
 export const decryptMessage = async (
@@ -49,26 +50,30 @@ export const decryptMessage = async (
 ): Promise<string> => {
   try {
     if (!encryptedBase64) return "";
-    const key = await getEncryptionKey(SHARED_SECRET);
-    const encryptedBytes = Uint8Array.from(
-      atob(encryptedBase64),
-      c => c.charCodeAt(0)
-    );
-    const iv = encryptedBytes.slice(0, 12);
-    const cipherText = encryptedBytes.slice(12);
-    const decrypted = await crypto.subtle.decrypt(
-      {
-        name: "AES-GCM",
-        iv,
-        tagLength: 128,
-      },
-      key,
-      cipherText
-    );
 
-    return new TextDecoder().decode(decrypted);
+    const key = getEncryptionKey(SHARED_SECRET);
+
+    const combined = forge.util.decode64(encryptedBase64);
+
+    const iv = combined.slice(0, 12);
+    const tag = combined.slice(combined.length - 16);
+    const ciphertext = combined.slice(12, combined.length - 16);
+
+    const decipher = forge.cipher.createDecipher("AES-GCM", key);
+
+    decipher.start({
+      iv,
+      tag: forge.util.createBuffer(tag),
+      tagLength: 128,
+    });
+
+    decipher.update(forge.util.createBuffer(ciphertext));
+    const pass = decipher.finish();
+
+    if (!pass) throw new Error("Auth failed");
+
+    return decipher.output.toString("utf8");
   } catch (error) {
-    console.warn("Decryption failed", error);
     return "Encrypted message";
   }
 };

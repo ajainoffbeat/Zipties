@@ -6,18 +6,18 @@ const runAuthTests = async () => {
     logger.info("🧪 Starting Auth API Tests...\n");
 
     // 1. Test: Create User
-    logger.info("📝 Step 1: Testing fn_create_user...");
+    logger.info("📝 Step 1: Testing create_user...");
     const email = `test_auth_${Date.now()}@example.com`;
     const password = "hashed_password_123";
     const firstName = "Test";
     const lastName = "User";
-    
+
     const userResult = await pool.query(
-      "SELECT * FROM fn_create_user($1, $2, $3, $4)",
+      "SELECT * FROM create_user($1, $2, $3, $4)",
       [email, password, firstName, lastName]
     );
     const createdUser = userResult.rows[0];
-    
+
     if (createdUser) {
       logger.info(`✅ User created successfully:`);
       logger.info(`   - User ID: ${createdUser.user_id}`);
@@ -29,13 +29,13 @@ const runAuthTests = async () => {
     }
 
     // 2. Test: Get User by Email
-    logger.info("🔍 Step 2: Testing fn_get_user_by_email...");
+    logger.info("🔍 Step 2: Testing get_user_by_email...");
     const getUserResult = await pool.query(
-      "SELECT * FROM fn_get_user_by_email($1)",
+      "SELECT * FROM get_user_by_email($1)",
       [email]
     );
     const retrievedUser = getUserResult.rows[0];
-    
+
     if (retrievedUser) {
       logger.info(`✅ User retrieved by email:`);
       logger.info(`   - User ID: ${retrievedUser.user_id}`);
@@ -49,13 +49,13 @@ const runAuthTests = async () => {
     }
 
     // 3. Test: Log User Login
-    logger.info("📥 Step 3: Testing fn_log_for_user_login...");
+    logger.info("📥 Step 3: Testing log_for_user_login...");
     const loginResult = await pool.query(
-      "SELECT fn_log_for_user_login($1) AS log_id",
+      "SELECT log_for_user_login($1) AS log_id",
       [createdUser.user_id]
     );
     const loginId = loginResult.rows[0]?.log_id;
-    
+
     if (loginId) {
       logger.info(`✅ User login logged successfully:`);
       logger.info(`   - Log ID: ${loginId}\n`);
@@ -70,7 +70,7 @@ const runAuthTests = async () => {
       [createdUser.user_id]
     );
     const logoutSuccess = logoutResult.rows[0]?.success === true;
-    
+
     if (logoutSuccess) {
       logger.info(`✅ User logout logged successfully\n`);
     } else {
@@ -81,13 +81,13 @@ const runAuthTests = async () => {
     logger.info("🔑 Step 5: Testing fn_update_user_password_reset_token...");
     const resetToken = `reset_token_${Date.now()}`;
     const expiresAt = new Date(Date.now() + 3600000); // 1 hour from now
-    
+
     const tokenUpdateResult = await pool.query(
       "SELECT fn_update_user_password_reset_token($1, $2, $3) AS success",
       [email, resetToken, expiresAt]
     );
     const tokenUpdateSuccess = tokenUpdateResult.rows[0]?.success === true;
-    
+
     if (tokenUpdateSuccess) {
       logger.info(`✅ Password reset token updated successfully:`);
       logger.info(`   - Token: ${resetToken}`);
@@ -103,7 +103,7 @@ const runAuthTests = async () => {
       [resetToken]
     );
     const tokenExists = verifyTokenResult.rows[0]?.token_exists === true;
-    
+
     if (tokenExists) {
       logger.info(`✅ Password reset token is valid\n`);
     } else {
@@ -113,13 +113,13 @@ const runAuthTests = async () => {
     // 7. Test: Reset Password with Token
     logger.info("🔄 Step 7: Testing fn_reset_password_with_token...");
     const newPassword = "new_hashed_password_456";
-    
+
     const resetResult = await pool.query(
       "SELECT fn_reset_password_with_token($1, $2) AS success",
       [resetToken, newPassword]
     );
     const resetSuccess = resetResult.rows[0]?.success === true;
-    
+
     if (resetSuccess) {
       logger.info(`✅ Password reset successfully\n`);
     } else {
@@ -133,7 +133,7 @@ const runAuthTests = async () => {
       [resetToken]
     );
     const tokenExistsAfterReset = verifyAfterResetResult.rows[0]?.token_exists === true;
-    
+
     if (!tokenExistsAfterReset) {
       logger.info(`✅ Token successfully cleared after password reset\n`);
     } else {
@@ -143,11 +143,11 @@ const runAuthTests = async () => {
     // 9. Test: Duplicate User Creation Prevention
     logger.info("🚫 Step 9: Testing duplicate user creation prevention...");
     const duplicateUserResult = await pool.query(
-      "SELECT * FROM fn_create_user($1, $2, $3, $4)",
+      "SELECT * FROM create_user($1, $2, $3, $4)",
       [email, password, firstName, lastName]
     );
     const duplicateUser = duplicateUserResult.rows[0];
-    
+
     if (!duplicateUser) {
       logger.info(`✅ Duplicate user creation prevented\n`);
     } else {
@@ -157,13 +157,13 @@ const runAuthTests = async () => {
     // 10. Test: Invalid Token Verification
     logger.info("❌ Step 10: Testing invalid token verification...");
     const invalidToken = "invalid_token_123";
-    
+
     const invalidTokenResult = await pool.query(
       "SELECT fn_verify_password_reset_token($1) AS token_exists",
       [invalidToken]
     );
     const invalidTokenExists = invalidTokenResult.rows[0]?.token_exists === true;
-    
+
     if (!invalidTokenExists) {
       logger.info(`✅ Invalid token correctly rejected\n`);
     } else {
@@ -177,7 +177,7 @@ const runAuthTests = async () => {
       [invalidToken, "some_password"]
     );
     const invalidResetSuccess = invalidResetResult.rows[0]?.success === true;
-    
+
     if (!invalidResetSuccess) {
       logger.info(`✅ Password reset with invalid token correctly rejected\n`);
     } else {
@@ -190,7 +190,7 @@ const runAuthTests = async () => {
       "SELECT fn_get_active_user_status_id() AS status_id"
     );
     const statusId = statusResult.rows[0]?.status_id;
-    
+
     if (statusId) {
       logger.info(`✅ Active user status ID: ${statusId}`);
     }
@@ -199,7 +199,7 @@ const runAuthTests = async () => {
       "SELECT fn_get_user_role_id('user') AS role_id"
     );
     const roleId = roleResult.rows[0]?.role_id;
-    
+
     if (roleId) {
       logger.info(`✅ User role ID: ${roleId}\n`);
     }
