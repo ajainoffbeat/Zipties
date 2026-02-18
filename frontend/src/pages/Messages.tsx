@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -94,22 +94,20 @@ export default function Messages() {
   }, [userId, targetConvoId, refreshId]);
 
 
-  // Handle scrolling to bottom when messages change or initial load completes
-  useEffect(() => {
+  // Use useLayoutEffect so scroll happens BEFORE the browser paints — no visible flash at top
+  useLayoutEffect(() => {
     if (isMessagesLoading || messages.length === 0) return;
 
     const lastMessage = messages[messages.length - 1];
     const isNewMessage = lastMessage.id !== lastMessageIdRef.current;
     const isFromMe = lastMessage.sender === "me";
 
-    // Initial load/Jump logic
+    // Initial load: jump instantly before paint so user never sees top
     if (shouldJumpRef.current) {
-      const timer = setTimeout(() => {
-        scrollToBottom("auto");
-        shouldJumpRef.current = false;
-      }, 50);
+      scrollToBottom("auto");
+      shouldJumpRef.current = false;
       lastMessageIdRef.current = lastMessage.id;
-      return () => clearTimeout(timer);
+      return;
     }
 
     // Live update logic
@@ -271,13 +269,10 @@ export default function Messages() {
         // Add to the list locally so it shows in sidebar
         setConversations([target, ...sortedInv]);
       }
-    } else if (!selectedConvo && sortedInv.length > 0) {
-      // Only auto-select first one if we don't have a selection already
-      target = sortedInv[0];
     }
 
     // Only load messages if we are switching to a NEW target
-    // If target.id === selectedConvo.id, it's just a background refresh of the sidebar
+    // I            f target.id === selectedConvo.id, it's just a background refresh of the sidebar
     const isNewSelection = target && target.id !== selectedConvo?.id;
     const shouldRefreshMessages = isNewSelection || isFirstLoadRef.current;
 
@@ -474,8 +469,7 @@ export default function Messages() {
                     <button
                       key={convo.id}
                       onClick={async () => {
-                        setMessages([]); // Clear messages immediately to prevent flicker
-                        setSelectedConvo(convo);
+                        setMessages([]);
                         setIsMessagesLoading(true);
                         shouldJumpRef.current = true;
                         setHasMore(true);
@@ -483,6 +477,8 @@ export default function Messages() {
                         const lastMessageId = apiMessages[apiMessages.length - 1]?.id;
                         if (lastMessageId) await getReadMessages(convo.id, lastMessageId);
                         const normalizedMsgs = await normalizeMessages(apiMessages, userId!);
+                        // Set convo + messages together so the chat area renders with content already loaded
+                        setSelectedConvo(convo);
                         setMessages(normalizedMsgs);
                         updateConversation(convo.id, { unread: 0 });
                         if (apiMessages.length < 20) setHasMore(false);

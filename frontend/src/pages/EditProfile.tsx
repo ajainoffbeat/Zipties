@@ -306,6 +306,7 @@ export default function EditProfile() {
                                   value={city.id.toString()}
                                   onSelect={() => {
                                     setValue("cityId", city.id);
+                                    setValue("cityName", city.city);
                                     setValue("location", `${city.name}, ${city.state}`);
                                     setOpen(false);
                                   }}

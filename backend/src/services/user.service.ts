@@ -32,23 +32,23 @@ export const updateUserProfile = async (
   profileData: UserProfileData
 ): Promise<boolean> => {
   try {
-    const result = await pool.query(
-      `SELECT fn_update_user(
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
-      ) AS success`,
-      [
-        userId,
-        profileData.first_name || null,
-        profileData.last_name || null,
-        profileData.username || null,
-        profileData.bio || null,
-        profileData.profile_image_url || null,
-        userId,
-        profileData.city_id || null,
-        profileData.interests || null,
-        profileData.tags || null,
-      ]
-    );
+ const result = await pool.query(
+  `SELECT fn_update_user(
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+  ) AS success`,
+  [
+    userId,
+    profileData.first_name ?? null,
+    profileData.last_name ?? null,
+    profileData.username ?? null,
+    profileData.bio ?? null,
+    profileData.profile_image_url ?? null,
+    userId,
+    profileData.city_id ?? null,
+    profileData.interests ?? null,
+    profileData.tags ?? null,
+  ]
+);
 
     logger.info('User profile updated successfully', { userId }, userId);
     return result.rows[0]?.success === true;

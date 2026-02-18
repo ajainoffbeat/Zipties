@@ -24,7 +24,7 @@ app.use(
 app.set("trust proxy", true);
 app.use(express.json());
 app.use("/uploads", express.static("public/uploads"));
-app.use(rateLimiter(RATE_LIMIT_REQ, RATE_LIMIT_TIME));
+// app.use(rateLimiter(RATE_LIMIT_REQ, RATE_LIMIT_TIME));
 
 app.use("/api", authRoutes);
 app.use("/api/conversation", authMiddleware, conversationRoutes);

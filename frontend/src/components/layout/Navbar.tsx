@@ -267,6 +267,67 @@ export function Navbar() {
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-border animate-slide-up">
             <div className="flex flex-col gap-2">
+              <div className="px-4 mb-2 relative">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search users..."
+                    className="w-full bg-secondary/50 rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 hover:bg-background/20 rounded-full"
+                    >
+                      <X className="w-3 h-3 text-muted-foreground" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Mobile Search Results */}
+                {searchQuery.trim() !== "" && (
+                  <div className="absolute top-full left-0 right-0 mt-2 mx-4 bg-card border border-border rounded-xl shadow-lg overflow-hidden z-50">
+                    <div className="max-h-[60vh] overflow-y-auto py-2">
+                      {isSearching ? (
+                        <div className="p-4 text-center">
+                          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-primary mx-auto" />
+                        </div>
+                      ) : searchResults.length > 0 ? (
+                        searchResults.map((user) => (
+                          <div
+                            key={user.id}
+                            className="flex items-center gap-3 px-4 py-3 hover:bg-secondary cursor-pointer transition-colors border-b border-border/50 last:border-0"
+                            onClick={() => {
+                              handleUserClick(user.id);
+                              setMobileMenuOpen(false);
+                            }}
+                          >
+                            <Avatar className="w-8 h-8 border border-border">
+                              <AvatarImage src={user.profile_image_url} />
+                              <AvatarFallback className="bg-primary/5 text-primary text-xs">
+                                {user.first_name?.[0]}{user.last_name?.[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold truncate">
+                                {user.first_name} {user.last_name}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate">{user.username}</p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-4 text-center text-sm text-muted-foreground">
+                          No users found
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
               {navItems.map((item) => {
                 const isActive = location.pathname === item.path;
                 const isMessages = item.label === "Messages";

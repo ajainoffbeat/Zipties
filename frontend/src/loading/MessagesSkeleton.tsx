@@ -2,7 +2,7 @@ export const MessagesSkeleton = () => {
   return (
     <div className="container mx-auto px-0 md:px-4 py-0 md:py-1">
       <div className="max-w-6xl mx-auto bg-card md:rounded-2xl border border-border shadow-sm h-[calc(100vh-2rem)] md:h-[calc(100vh-8rem)] overflow-hidden">
-        <div className="flex h-full">
+        <div className="flex">
 
           {/* Conversations Skeleton */}
           <div className="w-full md:w-80 border-r border-border flex flex-col">
