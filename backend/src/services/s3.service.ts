@@ -13,7 +13,7 @@ const s3Client = new S3Client({
   },
 });
 
-export const uploadToS3 = async (file: Express.Multer.File) => {
+export const uploadToS3 = async (file: Express.Multer.File, folder: string = 'misc') => {
   if (!env.AWS_S3_BUCKET_NAME) {
     throw new AppError(500, "AWS S3 Bucket Name is not configured");
   }
@@ -23,7 +23,7 @@ export const uploadToS3 = async (file: Express.Multer.File) => {
       client: s3Client,
       params: {
         Bucket: env.AWS_S3_BUCKET_NAME,
-        Key: `avatars/${Date.now()}-${file.originalname}`,
+        Key: `${folder}/${Date.now()}-${file.originalname}`,
         Body: file.buffer,
         ContentType: file.mimetype,
       },

@@ -94,7 +94,7 @@ export const uploadAvatar = async (
     if (!(req as any).file) {
       throw new AppError(400, "No file uploaded");
     }
-    const fileUrl = await uploadToS3((req as any).file);
+    const fileUrl = await uploadToS3((req as any).file,'avatars');
     const token = extractBearerToken(req.headers.authorization);
     const { userId } = decodeToken(token);
 
