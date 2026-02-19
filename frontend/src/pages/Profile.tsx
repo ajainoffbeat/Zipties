@@ -17,7 +17,7 @@ import { blockUser } from "@/lib/api/user.api";
 import { useParams } from "react-router-dom";
 import { createConversation } from "@/lib/api/messages.api";
 import { useToast } from "@/components/ui/use-toast";
-import { ProfileSkeleton } from "@/loading/ProfileSkeleton";
+import { ProfileSkeleton } from "@/components/skeletons/ProfileSkeleton";
 
 import { Ban } from "lucide-react";
 import {

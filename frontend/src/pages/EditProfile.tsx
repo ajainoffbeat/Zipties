@@ -31,7 +31,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { debounce } from "lodash";
-import { ProfileSkeleton } from "@/loading/ProfileSkeleton";
+import { ProfileSkeleton } from "@/components/skeletons/ProfileSkeleton";
 
 export default function EditProfile() {
   const { profile, updateProfile, loading } = useProfileStore();

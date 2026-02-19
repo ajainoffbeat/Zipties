@@ -34,8 +34,9 @@ import { blockUser } from "@/lib/api/user.api";
 import { toast } from "@/hooks/use-toast";
 import { containsProfanity } from "@/lib/profanity";
 import { encryptMessage, decryptMessage } from "@/lib/encryption";
-import { MessagesSkeleton } from "@/loading/MessagesSkeleton";
-import { ChatSkeleton } from "@/loading/ChatSkeleton";
+import { MessagesSkeleton } from "@/components/skeletons/MessagesSkeleton";
+import { ChatSkeleton } from "@/components/skeletons/ChatSkeleton";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function Messages() {
   const [isLoading, setIsLoading] = useState(true);
@@ -62,6 +63,7 @@ export default function Messages() {
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const shouldJumpRef = useRef(true);
+   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lastMessageIdRef = useRef<string | null>(null);
   const isFirstLoadRef = useRef(true);
 
@@ -375,6 +377,7 @@ export default function Messages() {
       });
 
       setNewMessage("");
+      textareaRef.current.style.height = "auto"
       updateMessageId(tempId, res.message_id);
       updateMessageStatus(res.message_id, "sent");
       socket.emit("new_message", {
@@ -438,6 +441,14 @@ export default function Messages() {
     }
   };
 
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setNewMessage(e.target.value)
+    // Auto-grow
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto"
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+    }
+  }
   return (
     <AppLayout>
       {isLoading ? (
@@ -674,12 +685,14 @@ export default function Messages() {
                         )
                       ) : (
                         <div className="flex items-center gap-2 md:gap-3">
-                          <Input
-                            placeholder="Type a message..."
+                          <Textarea
+                            ref={textareaRef}
+                            placeholder="Message"
                             value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
+                            onChange={handleChange}
                             onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                            className="flex-1"
+                            rows={1}
+                            className="flex-1 resize-none max-h-32 overflow-y-auto"
                           />
                           <Button variant="hero" size="icon" onClick={handleSend} className="shrink-0">
                             <Send className="w-4 h-4" />
