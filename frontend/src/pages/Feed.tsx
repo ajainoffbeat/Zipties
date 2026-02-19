@@ -3,16 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
-  Heart, 
-  MessageCircle, 
-  Share2, 
+import {
+  Heart,
+  MessageCircle,
+  Share2,
   MoreHorizontal,
-  Image,
-  Smile,
   Send,
-  TrendingUp,
-  Users,
   ImagePlus,
   AlertCircle,
   ImageIcon,
@@ -39,183 +35,19 @@ import {
 import { cn } from "@/lib/utils";
 import { useProfileStore } from "@/store/useProfileStore";
 import { usePostStore } from "@/store/usePostStore";
+import PostMediaGrid from "@/components/media/PostMediaGrid";
+import PostSkeleton from "@/components/skeletons/PostSkeleton";
+import { useDeletePost } from "@/hooks/useDeletePost";
+import { usePostComposer } from "@/hooks/usePostComposer";
+import { useImageHandler } from "@/hooks/useImageHandler";
 
-
-/* ─────────────────────────────────────────────
-   PostImageGrid — smart layout for 1-N images
-───────────────────────────────────────────── */
-function PostImageGrid({ images }: { images: string[] }) {
-  const [lightbox, setLightbox] = useState<number | null>(null);
-
-  if (images.length === 0) return null;
-
-  const MAX_VISIBLE = 4;
-  const visible = images.slice(0, MAX_VISIBLE);
-  const overflow = images.length - MAX_VISIBLE;
-
-  const gridClass =
-    images.length === 1
-      ? "grid-cols-1"
-      : images.length === 2
-        ? "grid-cols-2"
-        : images.length === 3
-          ? "grid-cols-3"
-          : "grid-cols-2";
-
-  return (
-    <>
-      <div className={cn("grid gap-0.5 bg-muted overflow-hidden", gridClass)}>
-        {visible.map((src, i) => {
-          const isLast = i === MAX_VISIBLE - 1 && overflow > 0;
-          const spanFull = images.length === 3 && i === 0;
-
-          return (
-            <div
-              key={i}
-              className={cn(
-                "relative overflow-hidden cursor-pointer group",
-                spanFull && "row-span-2",
-                images.length === 1 ? "aspect-[16/9]" : "aspect-square"
-              )}
-              onClick={() => setLightbox(i)}
-            >
-              <img
-                src={src}
-                alt={`Post image ${i + 1}`}
-                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                loading="lazy"
-              />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-200" />
-              {isLast && (
-                <div className="absolute inset-0 bg-black/55 flex items-center justify-center backdrop-blur-[1px]">
-                  <span className="text-white text-2xl font-bold tracking-tight">
-                    +{overflow + 1}
-                  </span>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Lightbox */}
-      {lightbox !== null && (
-        <div
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 animate-fade-in"
-          onClick={() => setLightbox(null)}
-        >
-          <button
-            className="absolute top-4 right-4 text-white bg-white/10 hover:bg-white/20 rounded-full p-2 transition-colors"
-            onClick={() => setLightbox(null)}
-          >
-            <X className="w-5 h-5" />
-          </button>
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white/70 text-sm font-medium bg-black/40 px-3 py-1 rounded-full backdrop-blur-sm">
-            {lightbox + 1} / {images.length}
-          </div>
-          <img
-            src={images[lightbox]}
-            alt="Full view"
-            className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          />
-          {lightbox > 0 && (
-            <button
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-3xl bg-white/10 hover:bg-white/20 rounded-full w-10 h-10 flex items-center justify-center transition-colors"
-              onClick={(e) => { e.stopPropagation(); setLightbox(lightbox - 1); }}
-            >
-              ‹
-            </button>
-          )}
-          {lightbox < images.length - 1 && (
-            <button
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-white text-3xl bg-white/10 hover:bg-white/20 rounded-full w-10 h-10 flex items-center justify-center transition-colors"
-              onClick={(e) => { e.stopPropagation(); setLightbox(lightbox + 1); }}
-            >
-              ›
-            </button>
-          )}
-          {images.length > 1 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
-              {images.map((thumb, i) => (
-                <button
-                  key={i}
-                  onClick={(e) => { e.stopPropagation(); setLightbox(i); }}
-                  className={cn(
-                    "w-10 h-10 rounded-md overflow-hidden border-2 transition-all",
-                    i === lightbox ? "border-white scale-110" : "border-white/30 opacity-60 hover:opacity-90"
-                  )}
-                >
-                  <img src={thumb} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </>
-  );
-}
-
-/* ─────────────────────────────────────────────
-   Post skeleton loader
-───────────────────────────────────────────── */
-function PostSkeleton() {
-  return (
-    <div className="bg-card rounded-2xl border border-border p-5 shadow-sm animate-pulse space-y-4">
-      <div className="flex gap-4">
-        <div className="w-11 h-11 rounded-full bg-muted shrink-0" />
-        <div className="flex-1 space-y-2 pt-1">
-          <div className="h-4 bg-muted rounded w-1/3" />
-          <div className="h-3 bg-muted rounded w-1/5" />
-        </div>
-        <div className="w-8 h-8 bg-muted rounded-xl" />
-      </div>
-      <div className="space-y-2">
-        <div className="h-4 bg-muted rounded w-full" />
-        <div className="h-4 bg-muted rounded w-4/5" />
-        <div className="h-4 bg-muted rounded w-2/3" />
-      </div>
-      <div className="h-52 bg-muted rounded-2xl" />
-      <div className="flex gap-2 pt-2">
-        <div className="h-8 bg-muted rounded-xl w-20" />
-        <div className="h-8 bg-muted rounded-xl w-20" />
-        <div className="h-8 bg-muted rounded-xl w-20" />
-      </div>
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────
-   Main Feed page
-───────────────────────────────────────────── */
 export default function Feed() {
   const { profile } = useProfileStore();
-  const { posts, isLoading, isCreating, error, fetchPosts, createPost, deletePost, toggleLike, clearError } =
-    usePostStore();
+  const { posts, isLoading, error, fetchPosts, toggleLike, clearError } = usePostStore();
   const navigate = useNavigate();
-
-  // Delete dialog state
-  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const handleDeleteConfirm = async () => {
-    if (!deletingPostId) return;
-    setIsDeleting(true);
-    try {
-      await deletePost(deletingPostId);
-      setDeletingPostId(null);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  // Composer state
-  const [newPost, setNewPost] = useState("");
-  const [selectedImages, setSelectedImages] = useState<string[]>([]);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
-  const [postError, setPostError] = useState<string | null>(null);
+  const deleteFlow = useDeletePost();
+  const images = useImageHandler();
+  const composer = usePostComposer(images.files);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load posts on mount
@@ -223,61 +55,7 @@ export default function Feed() {
     fetchPosts(true);
   }, []);
 
-  /* ── Image helpers ── */
-  const readFiles = (files: FileList | File[]) => {
-    Array.from(files).forEach((file) => {
-      if (!file.type.startsWith("image/")) return;
-      setSelectedFiles((prev) => [...prev, file]);
-      const reader = new FileReader();
-      reader.onload = (ev) =>
-        setSelectedImages((prev) => [...prev, ev.target?.result as string]);
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) readFiles(e.target.files);
-    e.target.value = "";
-  };
-
-  const handleRemoveImage = (index: number) => {
-    setSelectedImages((prev) => prev.filter((_, i) => i !== index));
-    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
-  const handleDragLeave = () => setIsDragging(false);
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files) readFiles(e.dataTransfer.files);
-  };
-
-  /* ── Submit post ── */
-  const handlePost = async () => {
-    const trimmed = newPost.trim();
-    if (!trimmed && selectedFiles.length === 0) return;
-    if (!trimmed) {
-      setPostError("Please add some text to your post.");
-      return;
-    }
-    if (trimmed.length > 200) {
-      setPostError("Post content must not exceed 200 characters.");
-      return;
-    }
-
-    setPostError(null);
-    try {
-      await createPost(trimmed, selectedFiles);
-      setNewPost("");
-      setSelectedImages([]);
-      setSelectedFiles([]);
-    } catch (err: any) {
-      setPostError(err?.response?.data?.message ?? "Failed to create post. Please try again.");
-    }
-  };
-
-  const charCount = newPost.length;
+  const charCount = composer.text.length;
   const charLimit = 200;
   const isOverLimit = charCount > charLimit;
 
@@ -292,11 +70,18 @@ export default function Feed() {
             <div
               className={cn(
                 "bg-card rounded-2xl border shadow-sm overflow-hidden transition-colors duration-200",
-                isDragging ? "border-primary/60 bg-primary/5" : "border-border"
+                images.isDragging ? "border-primary/60 bg-primary/5" : "border-border"
               )}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
+              onDragOver={(e) => {
+                e.preventDefault();
+                images.setIsDragging(true);
+              }}
+              onDragLeave={() => images.setIsDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                images.setIsDragging(false);
+                images.readFiles(e.dataTransfer.files);
+              }}
             >
               <div className="p-5">
                 <div className="flex gap-4">
@@ -310,27 +95,27 @@ export default function Feed() {
                   <div className="flex-1 min-w-0">
                     <textarea
                       placeholder="What's on your mind?"
-                      value={newPost}
-                      onChange={(e) => { setNewPost(e.target.value); setPostError(null); }}
+                      value={composer.text}
+                      onChange={(e) => { composer.setText(e.target.value) }}
                       className="w-full bg-transparent border-none resize-none focus:outline-none text-foreground placeholder:text-muted-foreground min-h-[60px] text-[15px] leading-relaxed"
                     />
 
-                    {/* Image previews */}
-                    {selectedImages.length > 0 && (
+
+                    {images.previews.length > 0 && (
                       <div className="mt-3 flex gap-2 flex-wrap">
-                        {selectedImages.map((src, i) => (
+                        {images.previews.map((src, i) => (
                           <div
                             key={i}
                             className="relative group rounded-xl overflow-hidden border border-border shadow-sm"
-                            style={{ width: selectedImages.length === 1 ? "100%" : "calc(50% - 4px)" }}
+                            style={{ width: images.previews.length === 1 ? "100%" : "calc(50% - 4px)" }}
                           >
                             <img
                               src={src}
                               alt={`Preview ${i + 1}`}
-                              className={cn("object-cover w-full", selectedImages.length === 1 ? "max-h-72" : "h-36")}
+                              className={cn("object-cover w-full", images.previews.length === 1 ? "max-h-72" : "h-36")}
                             />
                             <button
-                              onClick={() => handleRemoveImage(i)}
+                              onClick={() => images.remove(i)}
                               className="absolute top-1.5 right-1.5 bg-black/60 hover:bg-black/85 text-white rounded-full p-1 transition-all opacity-0 group-hover:opacity-100 backdrop-blur-sm"
                               title="Remove"
                             >
@@ -341,21 +126,21 @@ export default function Feed() {
                       </div>
                     )}
 
-                    {/* Drag hint */}
-                    {isDragging && selectedImages.length === 0 && (
+
+                    {images.isDragging && images.previews.length === 0 && (
                       <div className="mt-3 border-2 border-dashed border-primary/50 rounded-xl p-6 flex flex-col items-center justify-center gap-2 bg-primary/5">
                         <ImagePlus className="w-8 h-8 text-primary/60" />
                         <p className="text-sm text-muted-foreground">Drop images here</p>
                       </div>
                     )}
 
-                    {/* Char counter + error */}
+
                     <div className="flex items-center justify-between mt-2">
                       <div>
-                        {postError && (
+                        {composer.error && (
                           <p className="text-xs text-destructive flex items-center gap-1">
                             <AlertCircle className="w-3 h-3" />
-                            {postError}
+                            {composer.error}
                           </p>
                         )}
                       </div>
@@ -369,50 +154,45 @@ export default function Feed() {
                 </div>
               </div>
 
-              {/* Actions bar */}
+
               <div className="flex items-center justify-between px-5 py-3 border-t border-border bg-secondary/30">
                 <div className="flex gap-1 items-center">
                   <input
-                    ref={fileInputRef}
+                    ref={images.inputRef}
                     type="file"
                     accept="image/*"
                     multiple
                     className="hidden"
-                    onChange={handleImageSelect}
+                    onChange={(e) => {
+                      if (e.target.files) images.readFiles(e.target.files);
+                      e.target.value = "";
+                    }}
                   />
                   <Button
                     variant="ghost"
                     size="sm"
                     className="text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isCreating}
+                    onClick={() => images.inputRef.current?.click()}
+                    disabled={composer.isCreating}
                   >
                     <ImageIcon className="w-4 h-4 mr-1.5" />
                     Photo
-                    {selectedImages.length > 0 && (
+                    {images.previews.length > 0 && (
                       <span className="ml-1.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                        {selectedImages.length}
+                        {images.previews.length}
                       </span>
                     )}
                   </Button>
-                  {/* <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                    disabled={isCreating}
-                  >
-                    <Smile className="w-4 h-4 mr-1.5" />
-                    Emoji
-                  </Button> */}
+
                 </div>
                 <Button
                   variant="hero"
                   size="sm"
-                  disabled={(!newPost.trim() && selectedImages.length === 0) || isOverLimit || isCreating}
-                  onClick={handlePost}
+                  disabled={composer.isCreating}
+                  onClick={() => composer.submit(images.reset)}
                   className="gap-1.5 min-w-[72px]"
                 >
-                  {isCreating ? (
+                  {composer.isCreating ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : (
                     <>
@@ -424,7 +204,6 @@ export default function Feed() {
               </div>
             </div>
 
-            {/* Global fetch error */}
             {error && (
               <div className="flex items-center gap-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-xl p-4 text-sm">
                 <AlertCircle className="w-5 h-5 shrink-0" />
@@ -435,7 +214,6 @@ export default function Feed() {
               </div>
             )}
 
-            {/* Loading skeletons */}
             {isLoading && posts.length === 0 && (
               <>
                 <PostSkeleton />
@@ -444,7 +222,6 @@ export default function Feed() {
               </>
             )}
 
-            {/* Empty state */}
             {!isLoading && posts.length === 0 && !error && (
               <div className="bg-card rounded-2xl border border-border p-12 text-center">
                 <div className="w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -461,7 +238,6 @@ export default function Feed() {
               </div>
             )}
 
-            {/* Posts */}
             {posts.map((post) => {
               const imageUrls = post.assets
                 .sort((a, b) => a.position - b.position)
@@ -517,7 +293,7 @@ export default function Feed() {
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
-                            onClick={() => setDeletingPostId(post.postId)}
+                            onClick={() => deleteFlow.setPostId(post.postId)}
                           >
                             <Trash2 className="w-4 h-4" />
                             Delete post
@@ -539,7 +315,7 @@ export default function Feed() {
                   )}
 
                   {/* Images */}
-                  <PostImageGrid images={imageUrls} />
+                  <PostMediaGrid images={imageUrls} />
 
                   {/* Actions */}
                   <div className="flex items-center gap-1 px-4 py-2 border-t border-border">
@@ -569,7 +345,7 @@ export default function Feed() {
             })}
 
             {/* ── Delete Confirm Dialog ── */}
-            <Dialog open={!!deletingPostId} onOpenChange={(open) => !open && setDeletingPostId(null)}>
+            <Dialog open={!!deleteFlow.postId} onOpenChange={() => deleteFlow.setPostId(null)}>
               <DialogContent className="sm:max-w-sm">
                 <DialogHeader>
                   <DialogTitle>Delete post?</DialogTitle>
@@ -579,15 +355,15 @@ export default function Feed() {
                 </p>
                 <DialogFooter className="gap-2">
                   <DialogClose asChild>
-                    <Button variant="outline" disabled={isDeleting}>Cancel</Button>
+                    <Button variant="outline" disabled={deleteFlow.loading}>Cancel</Button>
                   </DialogClose>
                   <Button
                     variant="destructive"
-                    disabled={isDeleting}
-                    onClick={handleDeleteConfirm}
+                    disabled={deleteFlow.loading}
+                    onClick={deleteFlow.confirm}
                     className="gap-2"
                   >
-                    {isDeleting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    {deleteFlow.loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     Delete
                   </Button>
                 </DialogFooter>
@@ -611,54 +387,6 @@ export default function Feed() {
               </div>
             )}
           </div>
-
-          {/* ── Sidebar ── */}
-          <aside className="lg:col-span-4 space-y-6">
-            {/* Trending */}
-            {/* <div className="bg-card rounded-2xl border border-border p-5 shadow-sm">
-              <div className="flex items-center gap-2 mb-4">
-                <TrendingUp className="w-5 h-5 text-primary" />
-                <h3 className="font-semibold text-foreground">Trending Topics</h3>
-              </div>
-              <div className="space-y-1">
-                {trendingTopics.map((topic, index) => (
-                  <button
-                    key={index}
-                    className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-secondary transition-colors"
-                  >
-                    <span className="font-medium text-foreground">#{topic.tag}</span>
-                    <span className="text-sm text-muted-foreground">{topic.posts} posts</span>
-                  </button>
-                ))}
-              </div>
-            </div> */}
-
-            {/* Suggested People */}
-            {/* <div className="bg-card rounded-2xl border border-border p-5 shadow-sm">
-              <div className="flex items-center gap-2 mb-4">
-                <Users className="w-5 h-5 text-primary" />
-                <h3 className="font-semibold text-foreground">Suggested People</h3>
-              </div>
-              <div className="space-y-3">
-                {suggestedPeople.map((person, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="w-9 h-9">
-                        <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
-                          {person.initials}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium text-foreground text-sm">{person.name}</p>
-                        <p className="text-xs text-muted-foreground">{person.username}</p>
-                      </div>
-                    </div>
-                    <Button variant="outline" size="sm">Follow</Button>
-                  </div>
-                ))}
-              </div>
-            </div> */}
-          </aside>
         </div>
       </div>
     </AppLayout>

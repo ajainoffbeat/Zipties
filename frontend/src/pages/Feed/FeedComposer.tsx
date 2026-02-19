@@ -3,8 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ImageIcon, Send, AlertCircle, Loader2 } from "lucide-react";
 import ImagePreviewGrid from "@/components/media/ImagePreviewGrid";
 import { useProfileStore } from "@/store/useProfileStore";
-import { useFeedComposer } from "@/hooks/useFeedComposer";
-import { cn } from "@/lib/utils";
+import { useFeedComposer } from "@/hooks/useFeed";
 
 export default function FeedComposer() {
   const { profile } = useProfileStore();
