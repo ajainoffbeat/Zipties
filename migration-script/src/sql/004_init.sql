@@ -170,82 +170,109 @@ $$;
 -- Author        : OFFBEAT
 -- Created On    : 18/02/2026   
 -- ============================================================================
-CREATE OR REPLACE FUNCTION fn_get_post(p_post_id UUID, p_user_id UUID) RETURNS TABLE(
-        post_id UUID,
-        content VARCHAR,
-        is_blocked BOOLEAN,
-        created_at TIMESTAMP,
-        updated_at TIMESTAMP,
-        user_id UUID,
-        user_firstname VARCHAR,
-        user_lastname VARCHAR,
-        user_username VARCHAR,
-        assets JSON,
-        like_count INTEGER,
-        comment_count INTEGER,
-        is_liked BOOLEAN
-    ) LANGUAGE plpgsql AS $$ BEGIN RETURN QUERY
-SELECT p.id as post_id,
+CREATE OR REPLACE FUNCTION fn_get_post(
+    p_post_id UUID,
+    p_user_id UUID
+)
+RETURNS TABLE(
+    post_id UUID,
+    content VARCHAR,
+    is_blocked BOOLEAN,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
+    user_id UUID,
+    user_firstname VARCHAR,
+    user_lastname VARCHAR,
+    user_username VARCHAR,
+    assets JSON,
+    like_count INTEGER,
+    comment_count INTEGER,
+    is_liked BOOLEAN
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+RETURN QUERY
+SELECT 
+    p.id AS post_id,
     p.content,
     p.is_blocked,
     p.created_at,
     p.updated_at,
-    u.id as user_id,
-    u.firstname as user_firstname,
-    u.lastname as user_lastname,
-    u.username as user_username,
-    COALESCE(
-        json_agg(
-            json_build_object(
-                'id',
-                pa.id,
-                'url',
-                pa.url,
-                'mimetype',
-                pa.mimetype,
-                'file_size_bytes',
-                pa.file_size_bytes,
-                'position',
-                pa.position
-            )
-            ORDER BY pa.position
-        ) FILTER (
-            WHERE pa.id IS NOT NULL
-        ),
-        '[]'::json
-    ) as assets,
-    COUNT(DISTINCT CASE WHEN prt.name = 'like' AND pr.is_active = B'1' THEN pr.id END)::int as like_count,
-    COUNT(DISTINCT pc.id)::int as comment_count,
-    EXISTS(
-        SELECT 1
-        FROM public.post_reaction pr_inner
-        LEFT JOIN public.post_reaction_type prt_inner ON pr_inner.post_reaction_type_id = prt_inner.id
-        WHERE pr_inner.post_id = p.id
-            AND pr_inner.user_id = p_user_id
-            AND prt_inner.name = 'like'
-            AND pr_inner.is_active = B'1'
-    ) as is_liked
-FROM public.post p
-    LEFT JOIN public."user" u ON p.user_id = u.id
-    LEFT JOIN public.post_assets pa ON p.id = pa.post_id AND pa.is_active = true
-    LEFT JOIN public.post_reaction pr ON p.id = pr.post_id AND pr.is_active = B'1'
-    LEFT JOIN public.post_reaction_type prt ON pr.post_reaction_type_id = prt.id AND prt.name = 'like' AND prt.is_active = B'1'
-    LEFT JOIN public.post_comment pc ON p.id = pc.post_id AND pc.is_blocked = false
-WHERE p.id = p_post_id
-    AND p.is_blocked = false
-    AND u.is_blocked = false
-    AND u.is_active = true
-GROUP BY p.id,
-    p.content,
-    p.is_blocked,
-    p.created_at,
-    p.updated_at,
-    u.id,
+    u.id AS user_id,
     u.firstname,
     u.lastname,
-    u.username;
+    u.username,
+
+    -- ✅ Assets aggregated separately
+    COALESCE(pa.assets, '[]'::json) AS assets,
+
+    -- ✅ Likes counted separately
+    COALESCE(lc.like_count, 0) AS like_count,
+
+    -- ✅ Comments counted separately
+    COALESCE(cc.comment_count, 0) AS comment_count,
+
+    -- ✅ Is liked check
+    EXISTS (
+        SELECT 1
+        FROM public.post_reaction pr_inner
+        JOIN public.post_reaction_type prt_inner 
+            ON pr_inner.post_reaction_type_id = prt_inner.id
+        WHERE pr_inner.post_id = p.id
+          AND pr_inner.user_id = p_user_id
+          AND prt_inner.name = 'like'
+          AND pr_inner.is_active = B'1'
+    ) AS is_liked
+
+FROM public.post p
+JOIN public."user" u 
+    ON p.user_id = u.id
+
+-- 🔥 Aggregate assets separately
+LEFT JOIN LATERAL (
+    SELECT json_agg(
+        json_build_object(
+            'id', pa.id,
+            'url', pa.url,
+            'mimetype', pa.mimetype,
+            'file_size_bytes', pa.file_size_bytes,
+            'position', pa.position
+        )
+        ORDER BY pa.position
+    ) AS assets
+    FROM public.post_assets pa
+    WHERE pa.post_id = p.id
+      AND pa.is_active = true
+) pa ON TRUE
+
+-- 🔥 Count likes separately
+LEFT JOIN LATERAL (
+    SELECT COUNT(*)::int AS like_count
+    FROM public.post_reaction pr
+    JOIN public.post_reaction_type prt 
+        ON pr.post_reaction_type_id = prt.id
+    WHERE pr.post_id = p.id
+      AND prt.name = 'like'
+      AND pr.is_active = B'1'
+) lc ON TRUE
+
+-- 🔥 Count comments separately
+LEFT JOIN LATERAL (
+    SELECT COUNT(*)::int AS comment_count
+    FROM public.post_comment pc
+    WHERE pc.post_id = p.id
+      AND pc.is_blocked = false
+) cc ON TRUE
+
+WHERE p.id = p_post_id
+  AND p.is_blocked = false
+  AND u.is_blocked = false
+  AND u.is_active = true;
+
 END;
 $$;
+
 -- ============================================================================
 -- Function: fn_get_posts
 -- Purpose: Gets posts for home page with pagination
@@ -258,80 +285,107 @@ $$;
 -- Created On    : 18/02/2026
 -- ============================================================================
 CREATE OR REPLACE FUNCTION fn_get_posts(
-        p_user_id UUID,
-        p_limit INTEGER DEFAULT 20,
-        p_offset INTEGER DEFAULT 0
-    ) RETURNS TABLE(
-        post_id UUID,
-        content VARCHAR,
-        created_at TIMESTAMP,
-        user_id UUID,
-        user_firstname VARCHAR,
-        user_lastname VARCHAR,
-        user_username VARCHAR,
-        assets JSON,
-        like_count INTEGER,
-        comment_count INTEGER,
-        is_liked BOOLEAN
-    ) LANGUAGE plpgsql AS $$ BEGIN RETURN QUERY
-SELECT p.id as post_id,
+    p_user_id UUID,
+    p_limit INTEGER DEFAULT 20,
+    p_offset INTEGER DEFAULT 0
+)
+RETURNS TABLE(
+    post_id UUID,
+    content VARCHAR,
+    created_at TIMESTAMP,
+    user_id UUID,
+    user_firstname VARCHAR,
+    user_lastname VARCHAR,
+    user_username VARCHAR,
+    assets JSON,
+    like_count INTEGER,
+    comment_count INTEGER,
+    is_liked BOOLEAN
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+RETURN QUERY
+SELECT 
+    p.id AS post_id,
     p.content,
     p.created_at,
-    u.id as user_id,
-    u.firstname as user_firstname,
-    u.lastname as user_lastname,
-    u.username as user_username,
-    COALESCE(
-        json_agg(
-            json_build_object(
-                'id',
-                pa.id,
-                'url',
-                pa.url,
-                'mimetype',
-                pa.mimetype,
-                'file_size_bytes',
-                pa.file_size_bytes,
-                'position',
-                pa.position
-            )
-            ORDER BY pa.position
-        ) FILTER (
-            WHERE pa.id IS NOT NULL
-        ),
-        '[]'::json
-    ) as assets,
-    COUNT(DISTINCT CASE WHEN prt.name = 'like' AND pr.is_active = B'1' THEN pr.id END)::int as like_count,
-    COUNT(DISTINCT pc.id)::int as comment_count,
-    EXISTS(
-        SELECT 1
-        FROM public.post_reaction pr_inner
-        LEFT JOIN public.post_reaction_type prt_inner ON pr_inner.post_reaction_type_id = prt_inner.id
-        WHERE pr_inner.post_id = p.id
-            AND pr_inner.user_id = p_user_id
-            AND prt_inner.name = 'like'
-            AND pr_inner.is_active = B'1'
-    ) as is_liked
-FROM public.post p
-    LEFT JOIN public."user" u ON p.user_id = u.id
-    LEFT JOIN public.post_assets pa ON p.id = pa.post_id AND pa.is_active = true
-    LEFT JOIN public.post_reaction pr ON p.id = pr.post_id AND pr.is_active = B'1'
-    LEFT JOIN public.post_reaction_type prt ON pr.post_reaction_type_id = prt.id AND prt.name = 'like' AND prt.is_active = B'1'
-    LEFT JOIN public.post_comment pc ON p.id = pc.post_id AND pc.is_blocked = false
-WHERE p.is_blocked = false
-    AND u.is_blocked = false
-    AND u.is_active = true
-GROUP BY p.id,
-    p.content,
-    p.created_at,
-    u.id,
+    u.id AS user_id,
     u.firstname,
     u.lastname,
-    u.username
+    u.username,
+
+    -- ✅ Assets aggregated separately
+    COALESCE(pa.assets, '[]'::json) AS assets,
+
+    -- ✅ Likes counted separately
+    COALESCE(lc.like_count, 0) AS like_count,
+
+    -- ✅ Comments counted separately
+    COALESCE(cc.comment_count, 0) AS comment_count,
+
+    -- ✅ Is liked check
+    EXISTS (
+        SELECT 1
+        FROM public.post_reaction pr_inner
+        JOIN public.post_reaction_type prt_inner
+            ON pr_inner.post_reaction_type_id = prt_inner.id
+        WHERE pr_inner.post_id = p.id
+          AND pr_inner.user_id = p_user_id
+          AND prt_inner.name = 'like'
+          AND pr_inner.is_active = B'1'
+    ) AS is_liked
+
+FROM public.post p
+JOIN public."user" u 
+    ON p.user_id = u.id
+
+-- 🔥 Aggregate assets separately
+LEFT JOIN LATERAL (
+    SELECT json_agg(
+        json_build_object(
+            'id', pa.id,
+            'url', pa.url,
+            'mimetype', pa.mimetype,
+            'file_size_bytes', pa.file_size_bytes,
+            'position', pa.position
+        )
+        ORDER BY pa.position
+    ) AS assets
+    FROM public.post_assets pa
+    WHERE pa.post_id = p.id
+      AND pa.is_active = true
+) pa ON TRUE
+
+-- 🔥 Count likes separately
+LEFT JOIN LATERAL (
+    SELECT COUNT(*)::int AS like_count
+    FROM public.post_reaction pr
+    JOIN public.post_reaction_type prt
+        ON pr.post_reaction_type_id = prt.id
+    WHERE pr.post_id = p.id
+      AND prt.name = 'like'
+      AND pr.is_active = B'1'
+) lc ON TRUE
+
+-- 🔥 Count comments separately
+LEFT JOIN LATERAL (
+    SELECT COUNT(*)::int AS comment_count
+    FROM public.post_comment pc
+    WHERE pc.post_id = p.id
+      AND pc.is_blocked = false
+) cc ON TRUE
+
+WHERE p.is_blocked = false
+  AND u.is_blocked = false
+  AND u.is_active = true
+
 ORDER BY p.created_at DESC
 LIMIT p_limit OFFSET p_offset;
+
 END;
 $$;
+
 -- ============================================================================
 -- Function: fn_deactivate_post_assets
 -- Purpose: Deactivates (soft deletes) specified post assets
@@ -529,82 +583,109 @@ $$;
 -- Created On    : 18/02/2026
 -- ============================================================================
 CREATE OR REPLACE FUNCTION fn_search_posts(
-        p_search_query VARCHAR,
-        p_user_id UUID,
-        p_limit INTEGER DEFAULT 20,
-        p_offset INTEGER DEFAULT 0
-    ) RETURNS TABLE(
-        post_id UUID,
-        content VARCHAR,
-        created_at TIMESTAMP,
-        user_id UUID,
-        user_firstname VARCHAR,
-        user_lastname VARCHAR,
-        user_username VARCHAR,
-        assets JSON,
-        like_count INTEGER,
-        comment_count INTEGER,
-        is_liked BOOLEAN
-    ) LANGUAGE plpgsql AS $$ BEGIN RETURN QUERY
-SELECT p.id as post_id,
+    p_search_query VARCHAR,
+    p_user_id UUID,
+    p_limit INTEGER DEFAULT 20,
+    p_offset INTEGER DEFAULT 0
+)
+RETURNS TABLE(
+    post_id UUID,
+    content VARCHAR,
+    created_at TIMESTAMP,
+    user_id UUID,
+    user_firstname VARCHAR,
+    user_lastname VARCHAR,
+    user_username VARCHAR,
+    assets JSON,
+    like_count INTEGER,
+    comment_count INTEGER,
+    is_liked BOOLEAN
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+RETURN QUERY
+SELECT 
+    p.id AS post_id,
     p.content,
     p.created_at,
-    u.id as user_id,
-    u.firstname as user_firstname,
-    u.lastname as user_lastname,
-    u.username as user_username,
-    COALESCE(
-        json_agg(
-            json_build_object(
-                'id',
-                pa.id,
-                'url',
-                pa.url,
-                'mimetype',
-                pa.mimetype,
-                'file_size_bytes',
-                pa.file_size_bytes,
-                'position',
-                pa.position
-            )
-            ORDER BY pa.position
-        ) FILTER (
-            WHERE pa.id IS NOT NULL
-        ),
-        '[]'::json
-    ) as assets,
-    COUNT(DISTINCT CASE WHEN prt.name = 'like' AND pr.is_active = B'1' THEN pr.id END)::int as like_count,
-    COUNT(DISTINCT pc.id)::int as comment_count,
-    EXISTS(
-        SELECT 1
-        FROM public.post_reaction pr_inner
-        LEFT JOIN public.post_reaction_type prt_inner ON pr_inner.post_reaction_type_id = prt_inner.id
-        WHERE pr_inner.post_id = p.id
-            AND pr_inner.user_id = p_user_id
-            AND prt_inner.name = 'like'
-            AND pr_inner.is_active = B'1'
-    ) as is_liked
-FROM public.post p
-    LEFT JOIN public."user" u ON p.user_id = u.id
-    LEFT JOIN public.post_assets pa ON p.id = pa.post_id AND pa.is_active = true
-    LEFT JOIN public.post_reaction pr ON p.id = pr.post_id AND pr.is_active = B'1'
-    LEFT JOIN public.post_reaction_type prt ON pr.post_reaction_type_id = prt.id AND prt.name = 'like' AND prt.is_active = B'1'
-    LEFT JOIN public.post_comment pc ON p.id = pc.post_id AND pc.is_blocked = false
-WHERE p.is_blocked = false
-    AND u.is_blocked = false
-    AND u.is_active = true
-    AND p.content ILIKE '%' || p_search_query || '%'
-GROUP BY p.id,
-    p.content,
-    p.created_at,
-    u.id,
+    u.id AS user_id,
     u.firstname,
     u.lastname,
-    u.username
+    u.username,
+
+    -- ✅ Assets (isolated aggregation)
+    COALESCE(pa.assets, '[]'::json) AS assets,
+
+    -- ✅ Like count (isolated)
+    COALESCE(lc.like_count, 0) AS like_count,
+
+    -- ✅ Comment count (isolated)
+    COALESCE(cc.comment_count, 0) AS comment_count,
+
+    -- ✅ Is liked
+    EXISTS (
+        SELECT 1
+        FROM public.post_reaction pr_inner
+        JOIN public.post_reaction_type prt_inner
+            ON pr_inner.post_reaction_type_id = prt_inner.id
+        WHERE pr_inner.post_id = p.id
+          AND pr_inner.user_id = p_user_id
+          AND prt_inner.name = 'like'
+          AND pr_inner.is_active = B'1'
+    ) AS is_liked
+
+FROM public.post p
+JOIN public."user" u 
+    ON p.user_id = u.id
+
+-- 🔥 Assets
+LEFT JOIN LATERAL (
+    SELECT json_agg(
+        json_build_object(
+            'id', pa.id,
+            'url', pa.url,
+            'mimetype', pa.mimetype,
+            'file_size_bytes', pa.file_size_bytes,
+            'position', pa.position
+        )
+        ORDER BY pa.position
+    ) AS assets
+    FROM public.post_assets pa
+    WHERE pa.post_id = p.id
+      AND pa.is_active = true
+) pa ON TRUE
+
+-- 🔥 Like count
+LEFT JOIN LATERAL (
+    SELECT COUNT(*)::int AS like_count
+    FROM public.post_reaction pr
+    JOIN public.post_reaction_type prt
+        ON pr.post_reaction_type_id = prt.id
+    WHERE pr.post_id = p.id
+      AND prt.name = 'like'
+      AND pr.is_active = B'1'
+) lc ON TRUE
+
+-- 🔥 Comment count
+LEFT JOIN LATERAL (
+    SELECT COUNT(*)::int AS comment_count
+    FROM public.post_comment pc
+    WHERE pc.post_id = p.id
+      AND pc.is_blocked = false
+) cc ON TRUE
+
+WHERE p.is_blocked = false
+  AND u.is_blocked = false
+  AND u.is_active = true
+  AND p.content ILIKE '%' || p_search_query || '%'
+
 ORDER BY p.created_at DESC
 LIMIT p_limit OFFSET p_offset;
+
 END;
 $$;
+
 -- ============================================================================
 -- Function: fn_get_post_asset_urls_by_ids
 -- Purpose: Gets the URLs of specific active assets for a post
