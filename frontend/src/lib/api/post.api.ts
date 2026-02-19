@@ -41,3 +41,21 @@ export const editPost = async (postId: string, content: string, imageFiles: File
     });
     return res.data;
 };
+
+/** Toggle like on a post */
+export const togglePostLike = async (postId: string) => {
+    const res = await api.post(`/posts/like/${postId}`);
+    return res.data;
+};
+
+/** Get comments for a post */
+export const getPostComments = async (postId: string, limit = 20, offset = 0) => {
+    const res = await api.get(`/posts/comments/${postId}`, { params: { limit, offset } });
+    return res.data;
+};
+
+/** Create a comment on a post */
+export const createPostComment = async (postId: string, comment: string) => {
+    const res = await api.post(`/posts/comment/${postId}`, { comment });
+    return res.data;
+};

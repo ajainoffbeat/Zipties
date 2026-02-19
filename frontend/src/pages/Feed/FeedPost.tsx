@@ -1,4 +1,4 @@
-import { memo, useMemo, useCallback } from "react";
+import { memo, useMemo, useCallback, useState } from "react";
 import { Heart, Loader2, MessageCircle, MoreHorizontal, Pencil, Share2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/utils";
@@ -11,10 +11,12 @@ import { useDeletePost } from "@/hooks/useDeletePost";
 import { useNavigate } from "react-router-dom";
 import { useProfileStore } from "@/store/useProfileStore";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { InlineComments } from "@/components/comments/InlineComments";
 
 function FeedPost({ post }) {
   const navigate = useNavigate();
   const toggleLike = usePostStore((s) => s.toggleLike);
+  const [showComments, setShowComments] = useState(false);
 
   const imageUrls = useMemo(
     () =>
@@ -28,6 +30,10 @@ function FeedPost({ post }) {
     () => toggleLike(post.postId),
     [toggleLike, post.postId]
   );
+
+  const handleCommentClick = useCallback(() => {
+    setShowComments(true);
+  }, []);
 
   const deleteFlow = useDeletePost();
   const { profile } = useProfileStore();
@@ -120,14 +126,19 @@ function FeedPost({ post }) {
           <Heart className={cn("w-4 h-4 mr-1.5 transition-all", post.isLiked && "fill-current scale-110")} />
           <span className="text-sm font-medium">{post.likes}</span>
         </Button>
-        <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={handleCommentClick}
+          className="text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+        >
           <MessageCircle className="w-4 h-4 mr-1.5" />
           <span className="text-sm font-medium">{post.comments}</span>
         </Button>
-        <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
+        {/* <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
           <Share2 className="w-4 h-4 mr-1.5" />
           <span className="text-sm font-medium">{post.shares}</span>
-        </Button>
+        </Button> */}
 
         <ConfirmDialog
           open={!!deleteFlow.postId}
@@ -141,6 +152,14 @@ function FeedPost({ post }) {
         />
 
       </div>
+
+      {/* Inline Comments Section */}
+      <InlineComments
+        postId={post.postId}
+        commentCount={post.comments}
+        isOpen={showComments}
+        onClose={() => setShowComments(false)}
+      />
     </article>
   );
 }

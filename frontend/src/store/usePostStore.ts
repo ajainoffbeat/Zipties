@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { createPost as createPostApi, getPosts as getPostsApi, getPost as getPostApi, deletePost as deletePostApi, editPost as editPostApi } from "@/lib/api/post.api";
+import { createPost as createPostApi, getPosts as getPostsApi, getPost as getPostApi, deletePost as deletePostApi, editPost as editPostApi, togglePostLike as togglePostLikeApi, getPostComments as getPostCommentsApi, createPostComment as createPostCommentApi } from "@/lib/api/post.api";
 
 /* ── Types mirroring the backend PostResponse ── */
 export interface PostAsset {
@@ -50,7 +50,9 @@ interface PostState {
     createPost: (content: string, imageFiles: File[]) => Promise<void>;
     editPost: (postId: string, content: string, imageFiles: File[], removedImageIds?: string[]) => Promise<void>;
     deletePost: (postId: string) => Promise<void>;
-    toggleLike: (postId: string) => void;
+    toggleLike: (postId: string) => Promise<void>;
+    getPostComments: (postId: string, limit?: number, offset?: number) => Promise<any>;
+    createComment: (postId: string, comment: string) => Promise<void>;
     clearError: () => void;
 }
 
@@ -63,7 +65,14 @@ export const usePostStore = create<PostState>((set, get) => ({
 
     clearError: () => set({ error: null }),
 
-    toggleLike: (postId) => {
+    toggleLike: async (postId) => {
+        const currentPost = get().posts.find(p => p.postId === postId);
+        if (!currentPost) return;
+
+        // Optimistic update
+        const originalIsLiked = currentPost.isLiked;
+        const originalLikes = currentPost.likes;
+        
         set((state) => ({
             posts: state.posts.map((p) =>
                 p.postId === postId
@@ -71,6 +80,28 @@ export const usePostStore = create<PostState>((set, get) => ({
                     : p
             ),
         }));
+
+        try {
+            const response = await togglePostLikeApi(postId);
+            // Use the actual isLiked from backend response
+            set((state) => ({
+                posts: state.posts.map((p) =>
+                    p.postId === postId
+                        ? { ...p, isLiked: response.isLiked, likes: response.isLiked ? originalLikes + 1 : originalLikes - 1 }
+                        : p
+                ),
+            }));
+        } catch (err: any) {
+            // Revert optimistic update on error
+            set((state) => ({
+                posts: state.posts.map((p) =>
+                    p.postId === postId
+                        ? { ...p, isLiked: originalIsLiked, likes: originalLikes }
+                        : p
+                ),
+                error: err?.response?.data?.message ?? "Failed to toggle like",
+            }));
+        }
     },
 
     fetchPosts: async (reset = false) => {
@@ -86,10 +117,10 @@ export const usePostStore = create<PostState>((set, get) => ({
             // data shape: { success, message, posts, pagination, code }
             const incoming: Post[] = (data.posts ?? []).map((p: any) => ({
                 ...p,
-                likes: 0,
-                comments: 0,
+                likes: p.likeCount || 0,
+                comments: p.commentCount || 0,
                 shares: 0,
-                isLiked: false,
+                isLiked: p.isLiked || false,
             }));
 
             set((state) => ({
@@ -110,10 +141,10 @@ export const usePostStore = create<PostState>((set, get) => ({
             const data = await getPostApi(postId);
             return {
                 ...data,
-                likes: 0,
-                comments: 0,
+                likes: data.likeCount || 0,
+                comments: data.commentCount || 0,
                 shares: 0,
-                isLiked: false,
+                isLiked: data.isLiked || false,
             };
         } catch (err: any) {
             throw err;
@@ -173,6 +204,44 @@ export const usePostStore = create<PostState>((set, get) => ({
             set({
                 error: err?.response?.data?.message ?? "Failed to delete post",
             });
+            throw err;
+        }
+    },
+
+    getPostComments: async (postId, limit = 20, offset = 0) => {
+        try {
+            const data = await getPostCommentsApi(postId, limit, offset);
+            return data;
+        } catch (err: any) {
+            set({
+                error: err?.response?.data?.message ?? "Failed to get comments",
+            });
+            throw err;
+        }
+    },
+
+    createComment: async (postId, comment) => {
+        // Optimistic update
+        set((state) => ({
+            posts: state.posts.map((p) =>
+                p.postId === postId
+                    ? { ...p, comments: p.comments + 1 }
+                    : p
+            ),
+        }));
+
+        try {
+            await createPostCommentApi(postId, comment);
+        } catch (err: any) {
+            // Revert optimistic update on error
+            set((state) => ({
+                posts: state.posts.map((p) =>
+                    p.postId === postId
+                        ? { ...p, comments: p.comments - 1 }
+                        : p
+                ),
+                error: err?.response?.data?.message ?? "Failed to create comment",
+            }));
             throw err;
         }
     },
