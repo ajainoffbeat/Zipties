@@ -1,7 +1,7 @@
 import type { Response, Request, NextFunction } from "express";
 import fs from 'fs/promises';
 import { decodeToken, extractBearerToken } from "../utils/jwt.util.js";
-import { createPost, createPostAssets, editPost, deletePost, getPost, getPosts, searchPosts } from "../services/post.service.js";
+import { createPost, createPostAssets, editPost, deletePost, getPost, getPosts, searchPosts, getPostComments, createPostComment, togglePostLike } from "../services/post.service.js";
 import { AppError } from "../utils/response/appError.js";
 import { sendSuccess } from "../utils/response/appSuccess.js";
 import { RESPONSE_CODES } from "../constants/responseCode.constant.js";
@@ -368,6 +368,155 @@ export const searchPostsController = async (
     });
   } catch (err) {
     logger.error('Error in searchPostsController', { error: err });
+    next(err);
+  }
+};
+
+export const getPostCommentsController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const postId = req.params.postId as string;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    if (!postId) {
+      throw new AppError(400, "Post ID is required", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    if (limit < 1 || limit > 100) {
+      throw new AppError(400, "Limit must be between 1 and 100", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    if (offset < 0) {
+      throw new AppError(400, "Offset must be non-negative", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    const commentsResponse = await getPostComments(postId, limit, offset);
+    
+    return sendSuccess(res, {
+      status: 200,
+      message: "Post comments retrieved successfully",
+      ...commentsResponse,
+      code: RESPONSE_CODES.SUCCESS,
+    });
+  } catch (err) {
+    logger.error('Error in getPostCommentsController', { error: err });
+    next(err);
+  }
+};
+
+export const createPostCommentController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const token = extractBearerToken(req.headers.authorization);
+
+    const decoded = decodeToken(token);
+
+    if (!decoded || !decoded.userId) {
+      throw new AppError(401, RESPONSE_MESSAGES[RESPONSE_CODES.UNAUTHORIZED], {
+        code: RESPONSE_CODES.UNAUTHORIZED,
+        success: false,
+      });
+    }
+
+    const userId = decoded.userId as string;
+    const postId = req.params.postId as string;
+    const { comment } = req.body;
+
+    if (!postId) {
+      throw new AppError(400, "Post ID is required", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    if (!comment || typeof comment !== 'string' || comment.trim().length === 0) {
+      throw new AppError(400, "Comment is required and must be a non-empty string", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    if (comment.length > 150) {
+      throw new AppError(400, "Comment must not exceed 150 characters", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    const commentId = await createPostComment({ userId, postId, comment: comment.trim() });
+
+    if (!commentId) {
+      throw new AppError(500, "Failed to create comment", {
+        code: RESPONSE_CODES.INTERNAL_SERVER_ERROR,
+        success: false,
+      });
+    }
+
+    return sendSuccess(res, {
+      status: 201,
+      message: "Comment created successfully",
+      commentId,
+      code: RESPONSE_CODES.SUCCESS,
+    });
+  } catch (err) {
+    logger.error('Error in createPostCommentController', { error: err });
+    next(err);
+  }
+};
+
+export const togglePostLikeController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const token = extractBearerToken(req.headers.authorization);
+
+    const decoded = decodeToken(token);
+
+    if (!decoded || !decoded.userId) {
+      throw new AppError(401, RESPONSE_MESSAGES[RESPONSE_CODES.UNAUTHORIZED], {
+        code: RESPONSE_CODES.UNAUTHORIZED,
+        success: false,
+      });
+    }
+
+    const userId = decoded.userId as string;
+    const postId = req.params.postId as string;
+
+    if (!postId) {
+      throw new AppError(400, "Post ID is required", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    const isLiked = await togglePostLike(userId, postId);
+
+    return sendSuccess(res, {
+      status: 200,
+      message: isLiked ? "Post liked" : "Post unliked",
+      isLiked,
+      code: RESPONSE_CODES.SUCCESS,
+    });
+  } catch (err) {
+    logger.error('Error in togglePostLikeController', { error: err });
     next(err);
   }
 };

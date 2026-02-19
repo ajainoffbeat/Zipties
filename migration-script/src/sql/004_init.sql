@@ -28,8 +28,31 @@ VALUES (
         'Image files',
         b '1'
     );
+
+INSERT INTO public.post_reaction_type (
+        id,
+        name,
+        description,
+        is_active
+    )
+VALUES (
+        uuid_generate_v4(),
+        'like',
+        'Like reaction',
+        b '1'
+    );
+
 ALTER TABLE post_assets
 ALTER COLUMN url TYPE text USING url::text;
+
+-- Convert is_blocked from BIT(1) to BOOLEAN in post_comment table
+ALTER TABLE post_comment
+ALTER COLUMN is_blocked TYPE BOOLEAN
+USING (is_blocked::int = 1);
+
+-- Set default value for is_blocked in post_comment table
+ALTER TABLE post_comment
+ALTER COLUMN is_blocked SET DEFAULT FALSE;
 -- ============================================================================
 -- Function: fn_create_post
 -- Purpose: Creates a new post
@@ -142,7 +165,7 @@ $$;
 -- Purpose: Gets a single post with its assets and user information
 -- Parameters:
 --   p_post_id: UUID - The ID of the post to retrieve
--- Returns: Table with post details
+-- Returns: Table with post details including like and comment counts
 -- Author        : OFFBEAT
 -- Created On    : 18/02/2026   
 -- ============================================================================
@@ -156,7 +179,9 @@ CREATE OR REPLACE FUNCTION fn_get_post(p_post_id UUID) RETURNS TABLE(
         user_firstname VARCHAR,
         user_lastname VARCHAR,
         user_username VARCHAR,
-        assets JSON
+        assets JSON,
+        like_count INTEGER,
+        comment_count INTEGER
     ) LANGUAGE plpgsql AS $$ BEGIN RETURN QUERY
 SELECT p.id as post_id,
     p.content,
@@ -186,11 +211,15 @@ SELECT p.id as post_id,
             WHERE pa.id IS NOT NULL
         ),
         '[]'::json
-    ) as assets
+    ) as assets,
+    COUNT(DISTINCT CASE WHEN prt.name = 'like' AND pr.is_active = B'1' THEN pr.id END)::int as like_count,
+    COUNT(DISTINCT pc.id)::int as comment_count
 FROM public.post p
     LEFT JOIN public."user" u ON p.user_id = u.id
-    LEFT JOIN public.post_assets pa ON p.id = pa.post_id
-    AND pa.is_active = true
+    LEFT JOIN public.post_assets pa ON p.id = pa.post_id AND pa.is_active = true
+    LEFT JOIN public.post_reaction pr ON p.id = pr.post_id AND pr.is_active = B'1'
+    LEFT JOIN public.post_reaction_type prt ON pr.post_reaction_type_id = prt.id AND prt.name = 'like' AND prt.is_active = B'1'
+    LEFT JOIN public.post_comment pc ON p.id = pc.post_id AND pc.is_blocked = false
 WHERE p.id = p_post_id
     AND p.is_blocked = false
     AND u.is_blocked = false
@@ -212,7 +241,7 @@ $$;
 -- Parameters:
 --   p_limit: INTEGER - Number of posts to return
 --   p_offset: INTEGER - Number of posts to skip
--- Returns: Table with posts and their details
+-- Returns: Table with posts and their details including like and comment counts
 -- Author        : OFFBEAT
 -- Created On    : 18/02/2026
 -- ============================================================================
@@ -227,7 +256,9 @@ CREATE OR REPLACE FUNCTION fn_get_posts(
         user_firstname VARCHAR,
         user_lastname VARCHAR,
         user_username VARCHAR,
-        assets JSON
+        assets JSON,
+        like_count INTEGER,
+        comment_count INTEGER
     ) LANGUAGE plpgsql AS $$ BEGIN RETURN QUERY
 SELECT p.id as post_id,
     p.content,
@@ -255,11 +286,15 @@ SELECT p.id as post_id,
             WHERE pa.id IS NOT NULL
         ),
         '[]'::json
-    ) as assets
+    ) as assets,
+    COUNT(DISTINCT CASE WHEN prt.name = 'like' AND pr.is_active = B'1' THEN pr.id END)::int as like_count,
+    COUNT(DISTINCT pc.id)::int as comment_count
 FROM public.post p
     LEFT JOIN public."user" u ON p.user_id = u.id
-    LEFT JOIN public.post_assets pa ON p.id = pa.post_id
-    AND pa.is_active = true
+    LEFT JOIN public.post_assets pa ON p.id = pa.post_id AND pa.is_active = true
+    LEFT JOIN public.post_reaction pr ON p.id = pr.post_id AND pr.is_active = B'1'
+    LEFT JOIN public.post_reaction_type prt ON pr.post_reaction_type_id = prt.id AND prt.name = 'like' AND prt.is_active = B'1'
+    LEFT JOIN public.post_comment pc ON p.id = pc.post_id AND pc.is_blocked = false
 WHERE p.is_blocked = false
     AND u.is_blocked = false
     AND u.is_active = true
@@ -465,7 +500,7 @@ $$;
 --   p_search_query: VARCHAR - The search term to look for in post content
 --   p_limit: INTEGER - Number of posts to return
 --   p_offset: INTEGER - Number of posts to skip
--- Returns: Table with posts and their details
+-- Returns: Table with posts and their details including like and comment counts
 -- Author        : OFFBEAT
 -- Created On    : 18/02/2026
 -- ============================================================================
@@ -481,7 +516,9 @@ CREATE OR REPLACE FUNCTION fn_search_posts(
         user_firstname VARCHAR,
         user_lastname VARCHAR,
         user_username VARCHAR,
-        assets JSON
+        assets JSON,
+        like_count INTEGER,
+        comment_count INTEGER
     ) LANGUAGE plpgsql AS $$ BEGIN RETURN QUERY
 SELECT p.id as post_id,
     p.content,
@@ -509,11 +546,15 @@ SELECT p.id as post_id,
             WHERE pa.id IS NOT NULL
         ),
         '[]'::json
-    ) as assets
+    ) as assets,
+    COUNT(DISTINCT CASE WHEN prt.name = 'like' AND pr.is_active = B'1' THEN pr.id END)::int as like_count,
+    COUNT(DISTINCT pc.id)::int as comment_count
 FROM public.post p
     LEFT JOIN public."user" u ON p.user_id = u.id
-    LEFT JOIN public.post_assets pa ON p.id = pa.post_id
-    AND pa.is_active = true
+    LEFT JOIN public.post_assets pa ON p.id = pa.post_id AND pa.is_active = true
+    LEFT JOIN public.post_reaction pr ON p.id = pr.post_id AND pr.is_active = B'1'
+    LEFT JOIN public.post_reaction_type prt ON pr.post_reaction_type_id = prt.id AND prt.name = 'like' AND prt.is_active = B'1'
+    LEFT JOIN public.post_comment pc ON p.id = pc.post_id AND pc.is_blocked = false
 WHERE p.is_blocked = false
     AND u.is_blocked = false
     AND u.is_active = true
@@ -529,8 +570,6 @@ ORDER BY p.created_at DESC
 LIMIT p_limit OFFSET p_offset;
 END;
 $$;
-
-
 -- ============================================================================
 -- Function: fn_get_post_asset_urls_by_ids
 -- Purpose: Gets the URLs of specific active assets for a post
@@ -556,5 +595,165 @@ BEGIN
     WHERE pa.id = ANY(p_asset_ids)
       AND pa.post_id = p_post_id
       AND pa.is_active = true;
+END;
+$$;
+
+-- ============================================================================
+-- Function: fn_get_post_comments
+-- Purpose: Gets comments for a specific post with user information and pagination
+-- Parameters:
+--   p_post_id: UUID - The ID of the post to get comments for
+--   p_limit: INTEGER - Number of comments to return
+--   p_offset: INTEGER - Number of comments to skip
+-- Returns: Table with comment details and user information
+-- Author        : OFFBEAT
+-- Created On    : 19/02/2026
+-- ============================================================================
+CREATE OR REPLACE FUNCTION fn_get_post_comments(
+    p_post_id UUID,
+    p_limit INTEGER DEFAULT 20,
+    p_offset INTEGER DEFAULT 0
+) 
+RETURNS TABLE(
+    comment_id UUID,
+    post_id UUID,
+    comment VARCHAR,
+    user_id UUID,
+    created_at TIMESTAMP,
+    updated_by UUID,
+    updated_at TIMESTAMP,
+    is_blocked BOOLEAN,
+    blocked_at TIMESTAMP,
+    user_firstname VARCHAR,
+    user_lastname VARCHAR,
+    user_username VARCHAR
+) 
+LANGUAGE plpgsql 
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        pc.id AS comment_id,
+        pc.post_id,
+        pc.comment,
+        pc.user_id,
+        pc.created_at,
+        pc.updated_by,
+        pc.updated_at,
+        pc.is_blocked,
+        pc.blocked_at,
+        u.firstname AS user_firstname,
+        u.lastname AS user_lastname,
+        u.username AS user_username
+    FROM public.post_comment pc
+    LEFT JOIN public."user" u ON pc.user_id = u.id
+    WHERE pc.post_id = p_post_id
+        AND pc.is_blocked = FALSE
+        AND u.is_blocked = FALSE
+        AND u.is_active = TRUE
+    ORDER BY pc.created_at ASC
+    LIMIT p_limit OFFSET p_offset;
+END;
+$$;
+
+
+-- ============================================================================
+-- Function: fn_create_post_comment
+-- Purpose: Creates a new comment on a post
+-- Parameters:
+--   p_user_id: UUID - The ID of the user creating the comment
+--   p_post_id: UUID - The ID of the post being commented on
+--   p_comment: VARCHAR - The comment text
+-- Returns: UUID - The ID of the newly created comment
+-- Author        : OFFBEAT
+-- Created On    : 19/02/2026
+-- ============================================================================
+CREATE OR REPLACE FUNCTION fn_create_post_comment(p_user_id UUID, p_post_id UUID, p_comment VARCHAR) RETURNS UUID LANGUAGE plpgsql AS $$
+DECLARE v_comment_id UUID;
+BEGIN
+INSERT INTO public.post_comment (
+        user_id,
+        post_id,
+        comment,
+        created_at
+    )
+VALUES (
+        p_user_id,
+        p_post_id,
+        p_comment,
+        NOW()
+    )
+RETURNING id INTO v_comment_id;
+RETURN v_comment_id;
+END;
+$$;
+
+-- ============================================================================
+-- Function: fn_toggle_post_like
+-- Purpose: Toggles like reaction on a post for a user
+-- Parameters:
+--   p_user_id: UUID - The ID of the user
+--   p_post_id: UUID - The ID of the post
+-- Returns: BOOLEAN - True if liked after toggle, false if unliked
+-- Author        : CASCADE
+-- Created On    : 19/02/2026
+-- ============================================================================
+CREATE OR REPLACE FUNCTION fn_toggle_post_like(p_user_id UUID, p_post_id UUID) RETURNS BOOLEAN LANGUAGE plpgsql AS $$
+DECLARE v_reaction_type_id UUID;
+v_existing_reaction_id UUID;
+v_is_active BIT;
+BEGIN
+-- Get the like reaction type id
+SELECT id INTO v_reaction_type_id
+FROM public.post_reaction_type
+WHERE name = 'like' AND is_active = B'1'
+LIMIT 1;
+
+IF v_reaction_type_id IS NULL THEN
+    RAISE EXCEPTION 'Like reaction type not found';
+END IF;
+
+-- Check if reaction exists
+SELECT id, is_active INTO v_existing_reaction_id, v_is_active
+FROM public.post_reaction
+WHERE user_id = p_user_id AND post_id = p_post_id AND post_reaction_type_id = v_reaction_type_id
+LIMIT 1;
+
+IF v_existing_reaction_id IS NOT NULL THEN
+    -- Toggle
+    IF v_is_active = B'1' THEN
+        -- Unlike
+        UPDATE public.post_reaction
+        SET is_active = B'0', updated_by = p_user_id, updated_at = NOW()
+        WHERE id = v_existing_reaction_id;
+        RETURN FALSE;
+    ELSE
+        -- Like
+        UPDATE public.post_reaction
+        SET is_active = B'1', updated_by = p_user_id, updated_at = NOW()
+        WHERE id = v_existing_reaction_id;
+        RETURN TRUE;
+    END IF;
+ELSE
+    -- Insert new like
+    INSERT INTO public.post_reaction (
+        post_id,
+        post_reaction_type_id,
+        user_id,
+        is_active,
+        created_at,
+        updated_by,
+        updated_at
+    ) VALUES (
+        p_post_id,
+        v_reaction_type_id,
+        p_user_id,
+        B'1',
+        NOW(),
+        p_user_id,
+        NOW()
+    );
+    RETURN TRUE;
+END IF;
 END;
 $$;

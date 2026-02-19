@@ -3,6 +3,12 @@ export interface CreatePostRequest {
   content: string;
 }
 
+export interface CreateCommentRequest {
+  userId: string;
+  postId: string;
+  comment: string;
+}
+
 export interface EditPostRequest {
   postId: string;
   userId: string;
@@ -30,6 +36,8 @@ export interface PostResponse {
   isBlocked: boolean;
   createdAt: string;
   updatedAt: string | null;
+  likeCount: number;
+  commentCount: number;
   user: {
     userId: string;
     firstName: string;
@@ -47,6 +55,33 @@ export interface PostResponse {
 
 export interface PostsResponse {
   posts: PostResponse[];
+  pagination: {
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
+}
+
+export interface PostCommentResponse {
+  id: string;
+  postId: string;
+  comment: string;
+  userId: string;
+  createdAt: string;
+  updatedBy: string | null;
+  updatedAt: string | null;
+  isBlocked: boolean;
+  blockedAt: string | null;
+  user: {
+    userId: string;
+    firstName: string;
+    lastName: string;
+    username: string;
+  };
+}
+
+export interface PostCommentsResponse {
+  comments: PostCommentResponse[];
   pagination: {
     limit: number;
     offset: number;
