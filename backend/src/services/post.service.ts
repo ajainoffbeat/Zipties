@@ -3,6 +3,7 @@ import { pool } from "../config/db.js";
 import { logger } from "../utils/logger.js";
 import { AppError } from "../utils/response/appError.js";
 import { RESPONSE_CODES } from "../constants/responseCode.constant.js";
+import { deleteFromS3 } from "./s3.service.js";
 
 export const createPost = async (postData: CreatePostRequest): Promise<string | null> => {
   try {
@@ -40,6 +41,23 @@ export const editPost = async (postData: EditPostRequest, newAssets?: PostAssetD
 
     // Handle asset deletions first
     if (postData.deleteFilesIds && postData.deleteFilesIds.length > 0) {
+      // Get URLs of assets to be deleted before deactivating
+      const urlsResult = await pool.query(
+        'SELECT fn_get_post_asset_urls_by_ids($1, $2) as urls',
+        [postData.deleteFilesIds, postData.postId]
+      );
+      const urlsToDelete = urlsResult.rows.map(row => row.urls);
+
+      // Delete from S3
+      const deletePromises = urlsToDelete.map(url => deleteFromS3(url));
+      try {
+        await Promise.all(deletePromises);
+        logger.info('Assets deleted from S3', { count: urlsToDelete.length });
+      } catch (error) {
+        logger.error('Error deleting some assets from S3', { error });
+        // Continue with deactivation even if S3 delete fails
+      }
+
       const deactivateResult = await pool.query(
         'SELECT fn_deactivate_post_assets($1, $2, $3) as deactivated_count',
         [postData.userId, postData.deleteFilesIds, postData.postId]
@@ -117,6 +135,23 @@ export const deletePost = async (postData: { postId: string; userId: string }): 
       userId: postData.userId
     });
 
+    // Get URLs of all active assets before deleting the post
+    const urlsResult = await pool.query(
+      'SELECT * FROM fn_get_post_asset_urls($1)',
+      [postData.postId]
+    );
+    const urlsToDelete = urlsResult.rows.map(row => row.url);
+
+    // Delete from S3
+    const deletePromises = urlsToDelete.map(url => deleteFromS3(url));
+    try {
+      await Promise.all(deletePromises);
+      logger.info('Post assets deleted from S3', { count: urlsToDelete.length });
+    } catch (error) {
+      logger.error('Error deleting post assets from S3', { error });
+      // Continue with post deletion even if S3 delete fails
+    }
+
     const result = await pool.query(
       "SELECT fn_delete_post($1, $2) AS success",
       [postData.postId, postData.userId]
@@ -165,7 +200,7 @@ export const createPostAssets = async (assets: PostAssetData[]): Promise<void> =
     // Prepare assets data as JSONB array for the function
     const assetsData = assets.map((asset, index) => ({
       post_id: asset.postId,
-      url: `http://localhost:5000/posts/${asset.filename}`,
+      url: asset.url,
       mimetype: asset.mimetype,
       file_size_bytes: asset.size,
       position: maxPosition + index + 1,
@@ -196,7 +231,6 @@ try {
       "SELECT * FROM fn_get_post($1)",
       [postId]
     );
-    console.log("postId in getPost11", result.rows[0]);
 
     const post = result.rows[0];
     if (!post) {

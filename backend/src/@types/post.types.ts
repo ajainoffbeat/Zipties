@@ -18,7 +18,7 @@ export interface UpdatePostRequest {
 
 export interface PostAssetData {
   postId: string;
-  filename: string;
+  url: string;
   mimetype: string;
   size: number;
   userId: string;

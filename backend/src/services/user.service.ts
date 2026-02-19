@@ -3,7 +3,7 @@ import type {
   UserProfileData,
   UserProfile,
   City,
-  UserSearchResult
+  UserSearchResult,
 } from "../@types/user.types.js";
 import { AppError } from "../utils/response/appError.js";
 import { RESPONSE_CODES } from "../constants/responseCode.constant.js";
@@ -12,48 +12,55 @@ import { pool } from "../config/db.js";
 
 export const userProfile = async (
   currentUserId: string,
-  userId: string
+  userId: string,
 ): Promise<UserProfile | null> => {
-
   try {
     const result = await pool.query(
       `SELECT * FROM fn_get_user_profile($1, $2)`,
-      [currentUserId, userId]
+      [currentUserId, userId],
     );
     return result.rows[0] || null;
   } catch (error) {
-    logger.error('Failed to fetch user profile', { currentUserId, userId, error }, currentUserId);
+    logger.error(
+      "Failed to fetch user profile",
+      { currentUserId, userId, error },
+      currentUserId,
+    );
     throw error;
   }
-}
+};
 
 export const updateUserProfile = async (
   userId: string,
-  profileData: UserProfileData
+  profileData: UserProfileData,
 ): Promise<boolean> => {
   try {
- const result = await pool.query(
-  `SELECT fn_update_user(
+    const result = await pool.query(
+      `SELECT fn_update_user(
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
   ) AS success`,
-  [
-    userId,
-    profileData.first_name ?? null,
-    profileData.last_name ?? null,
-    profileData.username ?? null,
-    profileData.bio ?? null,
-    profileData.profile_image_url ?? null,
-    userId,
-    profileData.city_id ?? null,
-    profileData.interests ?? null,
-    profileData.tags ?? null,
-  ]
-);
+      [
+        userId,
+        profileData.first_name ?? null,
+        profileData.last_name ?? null,
+        profileData.username ?? null,
+        profileData.bio ?? null,
+        profileData.profile_image_url ?? null,
+        userId,
+        profileData.city_id?.trim() || null,
+        profileData.interests ?? null,
+        profileData.tags ?? null,
+      ],
+    );
 
-    logger.info('User profile updated successfully', { userId }, userId);
+    logger.info("User profile updated successfully", { userId }, userId);
     return result.rows[0]?.success === true;
   } catch (err) {
-    logger.error('Error updating user profile', { userId, profileData, error: err }, userId);
+    logger.error(
+      "Error updating user profile",
+      { userId, profileData, error: err },
+      userId,
+    );
     return false;
   }
 };
@@ -63,30 +70,40 @@ export const getUsCities = async (
   search?: string,
   state?: string,
   limit = 50,
-  offset = 0
+  offset = 0,
 ): Promise<City[]> => {
   try {
     const result = await pool.query(
       `SELECT * FROM fn_get_cities($1, $2, $3, $4, $5)`,
-      [
-        countryCode,
-        state || null,
-        search || null,
-        limit,
-        offset
-      ]
+      [countryCode, state || null, search || null, limit, offset],
     );
 
-    logger.debug('Cities fetched successfully', { countryCode, search, state, limit, offset, count: result.rows.length });
+    logger.debug("Cities fetched successfully", {
+      countryCode,
+      search,
+      state,
+      limit,
+      offset,
+      count: result.rows.length,
+    });
     return result.rows || [];
   } catch (err) {
-    logger.error('Error fetching cities', { countryCode, search, state, limit, offset, error: err });
+    logger.error("Error fetching cities", {
+      countryCode,
+      search,
+      state,
+      limit,
+      offset,
+      error: err,
+    });
     throw err;
   }
 };
 
-export const searchUsersByName = async (query: string, currentUserId: string): Promise<UserSearchResult[]> => {
-
+export const searchUsersByName = async (
+  query: string,
+  currentUserId: string,
+): Promise<UserSearchResult[]> => {
   if (!query || query.trim().length < 2) {
     return [];
   }
@@ -94,13 +111,21 @@ export const searchUsersByName = async (query: string, currentUserId: string): P
   try {
     const result = await pool.query(
       `SELECT * FROM fn_search_users_by_name($1, $2)`,
-      [query, currentUserId]
+      [query, currentUserId],
     );
 
-    logger.debug('User search completed', { query, currentUserId, count: result.rows.length }, currentUserId);
+    logger.debug(
+      "User search completed",
+      { query, currentUserId, count: result.rows.length },
+      currentUserId,
+    );
     return result.rows || [];
   } catch (error) {
-    logger.error('Error searching users by name', { query, currentUserId, error }, currentUserId);
+    logger.error(
+      "Error searching users by name",
+      { query, currentUserId, error },
+      currentUserId,
+    );
     throw error;
   }
 };
@@ -118,7 +143,7 @@ export const blockUser = async (
   userBlocked: string,
   userBlocking: string,
   isBlocking: boolean = true,
-  comment?: string
+  comment?: string,
 ): Promise<BlockUserResponse> => {
   // Validate inputs
   if (!userBlocked || !userBlocking) {
@@ -141,23 +166,23 @@ export const blockUser = async (
     if (isBlocking) {
       // Block operation: fn_block_user(p_user_id, p_blocked_user_id, p_comment)
       const result = await pool.query(
-        'SELECT * FROM fn_block_user($1, $2, $3)',
-        [userBlocking, userBlocked, comment || null]
+        "SELECT * FROM fn_block_user($1, $2, $3)",
+        [userBlocking, userBlocked, comment || null],
       );
 
       // Check if the operation was successful
       if (!result.rows[0]?.success) {
-        const message = result.rows[0]?.message || 'Block operation failed';
+        const message = result.rows[0]?.message || "Block operation failed";
 
         // Handle specific error cases
-        if (message.includes('already blocked')) {
+        if (message.includes("already blocked")) {
           throw new AppError(409, message, {
             code: RESPONSE_CODES.USER_ALREADY_EXISTS,
             success: false,
           });
         }
 
-        if (message.includes('do not exist') || message.includes('required')) {
+        if (message.includes("do not exist") || message.includes("required")) {
           throw new AppError(400, message, {
             code: RESPONSE_CODES.BAD_REQUEST,
             success: false,
@@ -178,24 +203,27 @@ export const blockUser = async (
       };
     } else {
       // Unblock operation: fn_unblock_user(p_user_id, p_blocked_user_id)
-      const result = await pool.query(
-        'SELECT * FROM fn_unblock_user($1, $2)',
-        [userBlocking, userBlocked]
-      );
+      const result = await pool.query("SELECT * FROM fn_unblock_user($1, $2)", [
+        userBlocking,
+        userBlocked,
+      ]);
 
       // Check if the operation was successful
       if (!result.rows[0]?.success) {
-        const message = result.rows[0]?.message || 'Unblock operation failed';
+        const message = result.rows[0]?.message || "Unblock operation failed";
 
         // Handle specific error cases
-        if (message.includes('not found')) {
+        if (message.includes("not found")) {
           throw new AppError(404, message, {
             code: RESPONSE_CODES.USER_NOT_FOUND,
             success: false,
           });
         }
 
-        if (message.includes('required') || message.includes('Invalid operation')) {
+        if (
+          message.includes("required") ||
+          message.includes("Invalid operation")
+        ) {
           throw new AppError(400, message, {
             code: RESPONSE_CODES.BAD_REQUEST,
             success: false,
@@ -222,7 +250,7 @@ export const blockUser = async (
     }
 
     // Handle database connection errors
-    if (error.code === 'ECONNREFUSED' || error.code === '3D000') {
+    if (error.code === "ECONNREFUSED" || error.code === "3D000") {
       throw new AppError(503, "Database service unavailable", {
         code: RESPONSE_CODES.INTERNAL_SERVER_ERROR,
         success: false,

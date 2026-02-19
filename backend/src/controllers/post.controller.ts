@@ -1,4 +1,5 @@
 import type { Response, Request, NextFunction } from "express";
+import fs from 'fs/promises';
 import { decodeToken, extractBearerToken } from "../utils/jwt.util.js";
 import { createPost, createPostAssets, editPost, deletePost, getPost, getPosts, searchPosts } from "../services/post.service.js";
 import { AppError } from "../utils/response/appError.js";
@@ -6,6 +7,7 @@ import { sendSuccess } from "../utils/response/appSuccess.js";
 import { RESPONSE_CODES } from "../constants/responseCode.constant.js";
 import { RESPONSE_MESSAGES } from "../constants/responseMessages.constant.js";
 import { logger } from "../utils/logger.js";
+import { uploadToS3 } from "../services/s3.service.js";
 
 export const createPostController = async (
   req: Request,
@@ -41,6 +43,18 @@ export const createPostController = async (
       });
     }
 
+    const files = req.files as Express.Multer.File[];
+    if (files && Array.isArray(files) && files.length > 0) {
+      const maxSize = 2 * 1024 * 1024;
+      const exceeds = files.some(file => file.size > maxSize);
+      if (exceeds) {
+        throw new AppError(400, "Image size exceeded", {
+          code: RESPONSE_CODES.BAD_REQUEST,
+          success: false,
+        });
+      }
+    }
+
     const postId = await createPost({ userId, content: content.trim() });
 
     if (!postId) {
@@ -49,19 +63,22 @@ export const createPostController = async (
         success: false,
       });
     }
-    const files = req.files as Express.Multer.File[];
     if (files && Array.isArray(files) && files.length > 0) {
+      // Upload images to S3 and collect URLs
+      const uploadPromises = files.map(file => uploadToS3(file, 'posts'));
+      const fileUrls = await Promise.all(uploadPromises);
+
       const assets: Array<{
         postId: string;
-        filename: string;
+        url: string;
         mimetype: string;
         size: number;
         userId: string;
-      }> = files.map((file: Express.Multer.File) => ({
+      }> = fileUrls.map((url, index) => ({
         postId,
-        filename: file.filename,
-        mimetype: file.mimetype,
-        size: file.size,
+        url,
+        mimetype: files[index].mimetype,
+        size: files[index].size,
         userId
       }));
       await createPostAssets(assets);
@@ -146,18 +163,22 @@ export const editPostController = async (
     const files = req.files as Express.Multer.File[];
     let newAssets: Array<{
       postId: string;
-      filename: string;
+      url: string;
       mimetype: string;
       size: number;
       userId: string;
     }> | undefined;
 
     if (files && Array.isArray(files) && files.length > 0) {
-      newAssets = files.map((file: Express.Multer.File) => ({
+      // Upload images to S3 and collect URLs
+      const uploadPromises = files.map(file => uploadToS3(file, 'posts'));
+      const fileUrls = await Promise.all(uploadPromises);
+
+      newAssets = fileUrls.map((url, index) => ({
         postId,
-        filename: file.filename,
-        mimetype: file.mimetype,
-        size: file.size,
+        url,
+        mimetype: files[index].mimetype,
+        size: files[index].size,
         userId
       }));
     }

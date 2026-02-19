@@ -11,7 +11,12 @@ export const errorMiddleware = (
 ) => {
   let error: AppError;
 
-  if (err instanceof AppError) {
+  if (err.name === 'MulterError' && err.code === 'LIMIT_FILE_SIZE') {
+    error = new AppError(400, "File size exceeds the allowed limit", {
+      success: false,
+      code: RESPONSE_CODES.FILE_TOO_LARGE
+    });
+  } else if (err instanceof AppError) {
     error = err;
     } else {
     logger.error("Unhandled error", { error: err });
