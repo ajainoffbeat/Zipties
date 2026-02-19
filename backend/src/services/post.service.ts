@@ -176,7 +176,7 @@ export const createPostAssets = async (assets: PostAssetData[]): Promise<void> =
     // Insert all assets using the PostgreSQL function
     const insertResult = await pool.query(
       'SELECT fn_insert_post_assets($1) as inserted_count',
-      [JSON.stringify(assetsData)]
+      [assetsData]
     );
 
     const insertedCount = parseInt(insertResult.rows[0].inserted_count);

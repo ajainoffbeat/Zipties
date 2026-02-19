@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import { editProfile, getProfileById } from "@/lib/api/user.api";
 
 interface Profile {
+  name: string;
   id: string;
   first_name: string;
   last_name: string;

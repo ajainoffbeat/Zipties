@@ -11,6 +11,7 @@ import Feed from "./pages/Feed";
 // import Marketplace from "./pages/Marketplace";
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
+import EditPost from "./pages/EditPost";
 import NotFound from "./pages/NotFound";
 import ForgotPassword from "./pages/ForgotPassword";
 import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute";
@@ -55,6 +56,7 @@ const App = () => {
             <Route path="/terms" element={<TermsOfService />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/feed" element={<Feed />} />
+              <Route path="/edit-post/:postId" element={<EditPost />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/profile/:userId" element={<Profile />} />
               <Route path="/edit-profile" element={<EditProfile />} />
