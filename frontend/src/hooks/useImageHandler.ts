@@ -18,6 +18,10 @@ export function useImageHandler() {
     });
   };
 
+    const setInitialPreviews = (urls: string[]) => {
+    setPreviews(urls);
+  };
+
   const remove = (index: number) => {
     setFiles((f) => f.filter((_, i) => i !== index));
     setPreviews((p) => p.filter((_, i) => i !== index));
@@ -34,6 +38,7 @@ export function useImageHandler() {
     isDragging,
     setIsDragging,
     readFiles,
+    setInitialPreviews,
     remove,
     reset,
     inputRef,

@@ -2,9 +2,9 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Search, 
-  Plus, 
+import {
+  Search,
+  Plus,
   Filter,
   Grid3X3,
   List,
@@ -13,7 +13,7 @@ import {
   MapPin
 } from "lucide-react";
 import { useState } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils/utils";
 
 const mockListings = [
   {
@@ -103,7 +103,7 @@ export default function Marketplace() {
   const [likedItems, setLikedItems] = useState<number[]>([]);
 
   const toggleLike = (id: number) => {
-    setLikedItems(prev => 
+    setLikedItems(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };

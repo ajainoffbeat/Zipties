@@ -16,7 +16,7 @@ import {
   ProfileFormValues,
 } from "@/lib/validators/profile.schema";
 import { getCitiesList, uploadAvatar } from "@/lib/api/user.api";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils/utils";
 import {
   Command,
   CommandEmpty,

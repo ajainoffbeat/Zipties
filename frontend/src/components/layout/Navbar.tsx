@@ -22,7 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useState, useEffect, useCallback } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils/utils";
 // import Cookies from "js-cookie";
 import { useNavigate } from "react-router-dom";
 import { removeCookie } from "@/utils/cookies";

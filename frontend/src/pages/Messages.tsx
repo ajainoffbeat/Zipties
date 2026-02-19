@@ -20,20 +20,20 @@ import {
   MessageCircle,
   Loader2
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils/utils";
 import { UserDropdownMenuTrigger } from "@/components/common/UserDropdown";
 import { useInboxStore } from "@/store/useInboxStore";
 import { getConversationMessages, getInbox, getReadMessages } from "@/lib/api/messages.api";
 import { Message, useMessageStore } from "@/store/useMessageStore";
 import { sendMessageApi } from "@/lib/api/messages.api";
-import { socket } from "@/lib/socket";
+import { socket } from "@/lib/utils/socket";
 import { useAuthStore } from "@/store/authStore";
 import { useProfileStore } from "@/store/useProfileStore";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { blockUser } from "@/lib/api/user.api";
 import { toast } from "@/hooks/use-toast";
-import { containsProfanity } from "@/lib/profanity";
-import { encryptMessage, decryptMessage } from "@/lib/encryption";
+import { containsProfanity } from "@/lib/utils/profanity";
+import { encryptMessage, decryptMessage } from "@/lib/utils/encryption";
 import { MessagesSkeleton } from "@/components/skeletons/MessagesSkeleton";
 import { ChatSkeleton } from "@/components/skeletons/ChatSkeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,7 +63,7 @@ export default function Messages() {
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const shouldJumpRef = useRef(true);
-   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lastMessageIdRef = useRef<string | null>(null);
   const isFirstLoadRef = useRef(true);
 

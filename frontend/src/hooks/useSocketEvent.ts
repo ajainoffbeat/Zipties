@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { socket } from "@/lib/socket";
+import { socket } from "@/lib/utils/socket";
 
 
 export const useSocketEvent = <T>(

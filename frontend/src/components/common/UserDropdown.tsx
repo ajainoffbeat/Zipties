@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { MoreVertical } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils/utils";
 
 type UserAction = {
   label: string;
@@ -45,7 +45,7 @@ export function UserDropdownMenuTrigger({
             onClick={() => action.onClick(userId)}
             className={cn(
               action.destructive &&
-                "text-destructive focus:text-white cursor-pointer"
+              "text-destructive focus:text-white cursor-pointer"
             )}
           >
             {action.icon && <span className="mr-2">{action.icon}</span>}

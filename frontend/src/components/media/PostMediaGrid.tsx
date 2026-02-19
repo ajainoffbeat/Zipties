@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils/utils";
 import { Lightbox } from "@/components/media/Lightbox";
 
 type PostMediaGridProps = {
@@ -24,10 +24,10 @@ export default function PostMediaGrid({
     images.length === 1
       ? "grid-cols-1"
       : images.length === 2
-      ? "grid-cols-2"
-      : images.length === 3
-      ? "grid-cols-3"
-      : "grid-cols-2";
+        ? "grid-cols-2"
+        : images.length === 3
+          ? "grid-cols-3"
+          : "grid-cols-2";
 
   return (
     <>

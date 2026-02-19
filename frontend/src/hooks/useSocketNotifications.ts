@@ -4,7 +4,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useSocketEvent } from "./useSocketEvent";
 import { formatMessageTime } from "@/utils/date";
 import { NewMessagePayload } from "@/types/socket";
-import { decryptMessage } from "@/lib/encryption";
+import { decryptMessage } from "@/lib/utils/encryption";
 
 /**
  * Hook to handle real-time notifications via Socket.io.

@@ -30,6 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 export default function Profile() {
   const { userId } = useParams();
@@ -173,29 +174,16 @@ export default function Profile() {
                     </div>
                   </div>
 
-                  <AlertDialog open={blockDialogOpen} onOpenChange={setBlockDialogOpen}>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Block {displayProfile?.first_name}?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          They won't be able to message you or find your profile in search. You can unblock them later from your settings.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isBlocking}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleBlockUser(true);
-                          }}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          disabled={isBlocking}
-                        >
-                          {isBlocking ? "Blocking..." : "Block User"}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  <ConfirmDialog
+                    open={blockDialogOpen}
+                    onOpenChange={setBlockDialogOpen}
+                    title={`Block ${displayProfile?.first_name}?`}
+                    description="They won't be able to message you or find your profile in search. You can unblock them later from your settings."
+                    confirmText="Block User"
+                    confirmVariant="destructive"
+                    loading={isBlocking}
+                    onConfirm={() => handleBlockUser(true)}
+                  />
 
                   <p className="text-foreground text-sm md:text-base leading-relaxed mb-4 max-w-2xl">
                     {displayProfile?.bio}

@@ -5,7 +5,7 @@ import { jwtDecode } from "jwt-decode";
 import { useProfileStore } from "./useProfileStore";
 import { useInboxStore } from "./useInboxStore";
 import { useMessageStore } from "./useMessageStore";
-import { connectSocket, disconnectSocket } from "../lib/socket";
+import { connectSocket, disconnectSocket } from "../lib/utils/socket";
 
 type JwtPayload = {
   userId: string;
