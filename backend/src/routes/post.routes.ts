@@ -6,6 +6,9 @@ import {
   getPostController,
   getPostsController,
   searchPostsController,
+  getPostCommentsController,
+  createPostCommentController,
+  togglePostLikeController,
 } from "../controllers/post.controller.js";
 import { uploadPostImages } from "../middlewares/multer.middleware.js";
 
@@ -19,6 +22,15 @@ router.get("/get/:postId", getPostController);
 
 // Search posts
 router.get("/search", searchPostsController);
+
+// Get comments for a specific post
+router.get("/comments/:postId", getPostCommentsController);
+
+// Create a comment on a specific post
+router.post("/comment/:postId", createPostCommentController);
+
+// Toggle like on a specific post
+router.post("/like/:postId", togglePostLikeController);
 
 // Create a new post
 router.post(

@@ -1,4 +1,4 @@
-import type { CreatePostRequest, EditPostRequest, UpdatePostRequest, PostAssetData, PostResponse, PostsResponse } from "../@types/post.types.js";
+import type { CreatePostRequest, EditPostRequest, UpdatePostRequest, PostAssetData, PostResponse, PostsResponse, PostCommentsResponse, CreateCommentRequest } from "../@types/post.types.js";
 import { pool } from "../config/db.js";
 import { logger } from "../utils/logger.js";
 import { AppError } from "../utils/response/appError.js";
@@ -128,6 +128,7 @@ export const editPost = async (postData: EditPostRequest, newAssets?: PostAssetD
     throw error;
   }
 };
+
 export const deletePost = async (postData: { postId: string; userId: string }): Promise<boolean> => {
   try {
     logger.debug('Deleting post', {
@@ -181,8 +182,6 @@ export const deletePost = async (postData: { postId: string; userId: string }): 
   }
 };
 
-
-
 export const createPostAssets = async (assets: PostAssetData[]): Promise<void> => {
   try {
     if (assets.length === 0) return;
@@ -225,7 +224,7 @@ export const createPostAssets = async (assets: PostAssetData[]): Promise<void> =
 };
 
 export const getPost = async (postId: string): Promise<PostResponse | null> => {
-try {
+  try {
     logger.debug('Getting post', { postId });
     const result = await pool.query(
       "SELECT * FROM fn_get_post($1)",
@@ -244,6 +243,8 @@ try {
       isBlocked: post.is_blocked === '1',
       createdAt: post.created_at.toISOString(),
       updatedAt: post.updated_at ? post.updated_at.toISOString() : null,
+      likeCount: post.like_count,
+      commentCount: post.comment_count,
       user: {
         userId: post.user_id,
         firstName: post.user_firstname || '',
@@ -264,8 +265,6 @@ try {
   }
 };
 
-
-
 export const getPosts = async (limit: number = 20, offset: number = 0): Promise<PostsResponse> => {
   try {
     logger.debug('Getting posts', { limit, offset });
@@ -275,12 +274,27 @@ export const getPosts = async (limit: number = 20, offset: number = 0): Promise<
       [limit, offset]
     );
 
-    const posts: PostResponse[] = result.rows.map(post => ({
+    const postsData = result.rows;
+
+    if (postsData.length === 0) {
+      return {
+        posts: [],
+        pagination: {
+          limit,
+          offset,
+          hasMore: false
+        }
+      };
+    }
+
+    const posts: PostResponse[] = postsData.map(post => ({
       postId: post.post_id,
       content: post.content,
       isBlocked: false, // Already filtered
       createdAt: post.created_at.toISOString(),
       updatedAt: null, // Not returned in fn_get_posts
+      likeCount: post.like_count,
+      commentCount: post.comment_count,
       user: {
         userId: post.user_id,
         firstName: post.user_firstname || '',
@@ -329,12 +343,27 @@ export const searchPosts = async (searchQuery: string, limit: number = 20, offse
       [searchQuery.trim(), limit, offset]
     );
 
-    const posts: PostResponse[] = result.rows.map(post => ({
+    const postsData = result.rows;
+
+    if (postsData.length === 0) {
+      return {
+        posts: [],
+        pagination: {
+          limit,
+          offset,
+          hasMore: false
+        }
+      };
+    }
+
+    const posts: PostResponse[] = postsData.map(post => ({
       postId: post.post_id,
       content: post.content,
       isBlocked: false, // Already filtered
       createdAt: post.created_at.toISOString(),
       updatedAt: null, // Not returned in fn_search_posts
+      likeCount: post.like_count,
+      commentCount: post.comment_count,
       user: {
         userId: post.user_id,
         firstName: post.user_firstname || '',
@@ -362,6 +391,110 @@ export const searchPosts = async (searchQuery: string, limit: number = 20, offse
       searchQuery,
       limit,
       offset,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    throw error;
+  }
+};
+
+export const getPostComments = async (postId: string, limit: number = 20, offset: number = 0): Promise<PostCommentsResponse> => {
+  try {
+    logger.debug('Getting post comments', { postId, limit, offset });
+
+    const result = await pool.query(
+      "SELECT * FROM fn_get_post_comments($1, $2, $3)",
+      [postId, limit, offset]
+    );
+
+    const comments = result.rows.map(comment => ({
+      id: comment.comment_id,
+      postId: comment.post_id,
+      comment: comment.comment,
+      userId: comment.user_id,
+      createdAt: comment.created_at.toISOString(),
+      updatedBy: comment.updated_by,
+      updatedAt: comment.updated_at ? comment.updated_at.toISOString() : null,
+      isBlocked: comment.is_blocked === '1',
+      blockedAt: comment.blocked_at ? comment.blocked_at.toISOString() : null,
+      user: {
+        userId: comment.user_id,
+        firstName: comment.user_firstname || '',
+        lastName: comment.user_lastname || '',
+        username: comment.user_username || ''
+      }
+    }));
+
+    const hasMore = comments.length === limit;
+
+    const response: PostCommentsResponse = {
+      comments,
+      pagination: {
+        limit,
+        offset,
+        hasMore
+      }
+    };
+
+    logger.debug('Post comments retrieved successfully', { postId, count: comments.length, limit, offset });
+    return response;
+  } catch (error) {
+    logger.error('Failed to get post comments', {
+      postId,
+      limit,
+      offset,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    throw error;
+  }
+};
+
+export const createPostComment = async (commentData: CreateCommentRequest): Promise<string | null> => {
+  try {
+    logger.debug('Creating new comment', { userId: commentData.userId, postId: commentData.postId });
+
+    const result = await pool.query(
+      "SELECT fn_create_post_comment($1, $2, $3) AS comment_id",
+      [commentData.userId, commentData.postId, commentData.comment]
+    );
+
+    const commentId = result.rows[0]?.comment_id;
+    if (commentId) {
+      logger.info('Comment created successfully', {
+        commentId,
+        userId: commentData.userId,
+        postId: commentData.postId
+      });
+    }
+
+    return commentId || null;
+  } catch (error) {
+    logger.error('Failed to create comment', {
+      userId: commentData.userId,
+      postId: commentData.postId,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    throw error;
+  }
+};
+
+export const togglePostLike = async (userId: string, postId: string): Promise<boolean> => {
+  try {
+    logger.debug('Toggling like on post', { userId, postId });
+    console.log('Toggling like on post', { userId, postId });
+
+    const result = await pool.query(
+      "SELECT fn_toggle_post_like($1, $2) AS is_liked",
+      [userId, postId]
+    );
+
+    const isLiked = result.rows[0]?.is_liked === true;
+    logger.info('Like toggled successfully', { userId, postId, isLiked });
+
+    return isLiked;
+  } catch (error) {
+    logger.error('Failed to toggle like', {
+      userId,
+      postId,
       error: error instanceof Error ? error.message : 'Unknown error'
     });
     throw error;
