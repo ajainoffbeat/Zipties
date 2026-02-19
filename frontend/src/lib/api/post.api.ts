@@ -59,3 +59,9 @@ export const createPostComment = async (postId: string, comment: string) => {
     const res = await api.post(`/posts/comment/${postId}`, { comment });
     return res.data;
 };
+
+/** Search posts by content */
+export const searchPosts = async (searchQuery: string, limit = 20, offset = 0) => {
+    const res = await api.get("/posts/search", { params: { q: searchQuery, limit, offset } });
+    return res.data;
+};

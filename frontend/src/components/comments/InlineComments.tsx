@@ -20,7 +20,7 @@ interface Comment {
     firstName: string;
     lastName: string;
     username: string;
-    profile_image_url?: string;
+    profileImageUrl?: string;
   };
 }
 
@@ -154,7 +154,7 @@ export function InlineComments({ postId, commentCount, isOpen, onClose }: Inline
             console.log(comment),
             <div key={comment.id} className="flex gap-3">
               <Avatar className="w-8 h-8 shrink-0">
-                <AvatarImage src={comment.user.profile_image_url} />
+                <AvatarImage src={comment.user.profileImageUrl} />
                 <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary font-medium text-xs border border-primary/20">
                   {(comment.user.firstName?.[0] ?? "") + (comment.user.lastName?.[0] ?? "U")}
                 </AvatarFallback>

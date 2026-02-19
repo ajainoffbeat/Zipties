@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { createPost as createPostApi, getPosts as getPostsApi, getPost as getPostApi, deletePost as deletePostApi, editPost as editPostApi, togglePostLike as togglePostLikeApi, getPostComments as getPostCommentsApi, createPostComment as createPostCommentApi } from "@/lib/api/post.api";
+import { createPost as createPostApi, getPosts as getPostsApi, getPost as getPostApi, deletePost as deletePostApi, editPost as editPostApi, togglePostLike as togglePostLikeApi, getPostComments as getPostCommentsApi, createPostComment as createPostCommentApi, searchPosts as searchPostsApi } from "@/lib/api/post.api";
 
 /* ── Types mirroring the backend PostResponse ── */
 export interface PostAsset {
@@ -44,8 +44,14 @@ interface PostState {
     isLoading: boolean;
     isCreating: boolean;
     error: string | null;
+    searchQuery: string;
+    isSearching: boolean;
+    searchResults: Post[];
+    searchPagination: Pagination;
 
     fetchPosts: (reset?: boolean) => Promise<void>;
+    searchPosts: (query: string, reset?: boolean) => Promise<void>;
+    clearSearch: () => void;
     getPost: (postId: string) => Promise<Post>;
     createPost: (content: string, imageFiles: File[]) => Promise<void>;
     editPost: (postId: string, content: string, imageFiles: File[], removedImageIds?: string[]) => Promise<void>;
@@ -62,6 +68,10 @@ export const usePostStore = create<PostState>((set, get) => ({
     isLoading: false,
     isCreating: false,
     error: null,
+    searchQuery: "",
+    isSearching: false,
+    searchResults: [],
+    searchPagination: { limit: 20, offset: 0, hasMore: true },
 
     clearError: () => set({ error: null }),
 
@@ -135,6 +145,44 @@ export const usePostStore = create<PostState>((set, get) => ({
             });
         }
     },
+
+    searchPosts: async (query, reset = false) => {
+        const { searchPagination, isSearching } = get();
+        if (isSearching) return;
+        if (!reset && !searchPagination.hasMore) return;
+
+        const offset = reset ? 0 : searchPagination.offset;
+        set({ isSearching: true, searchQuery: query, error: null });
+
+        try {
+            const data = await searchPostsApi(query, searchPagination.limit, offset);
+            const incoming: Post[] = (data.posts ?? []).map((p: any) => ({
+                ...p,
+                likes: p.likeCount || 0,
+                comments: p.commentCount || 0,
+                shares: 0,
+                isLiked: p.isLiked || false,
+            }));
+
+            set((state) => ({
+                searchResults: reset ? incoming : [...state.searchResults, ...incoming],
+                searchPagination: data.pagination ?? state.searchPagination,
+                isSearching: false,
+            }));
+        } catch (err: any) {
+            set({
+                isSearching: false,
+                error: err?.response?.data?.message ?? "Failed to search posts",
+            });
+        }
+    },
+
+    clearSearch: () => set({
+        searchQuery: "",
+        searchResults: [],
+        searchPagination: { limit: 20, offset: 0, hasMore: true },
+        isSearching: false,
+    }),
 
     getPost: async (postId) => {
         try {
