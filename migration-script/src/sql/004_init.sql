@@ -481,3 +481,67 @@ BEGIN
     RETURN v_count;
 END;
 $$;
+
+-- ============================================================================
+-- Function: fn_search_posts
+-- Purpose: Searches posts by content with pagination
+-- Parameters:
+--   p_search_query: VARCHAR - The search term to look for in post content
+--   p_limit: INTEGER - Number of posts to return
+--   p_offset: INTEGER - Number of posts to skip
+-- Returns: Table with posts and their details
+-- Author        : OFFBEAT
+-- Created On    : 18/02/2026
+-- ============================================================================
+CREATE OR REPLACE FUNCTION fn_search_posts(
+    p_search_query VARCHAR,
+    p_limit INTEGER DEFAULT 20,
+    p_offset INTEGER DEFAULT 0
+)
+RETURNS TABLE(
+    post_id UUID,
+    content VARCHAR,
+    created_at TIMESTAMP,
+    user_id UUID,
+    user_firstname VARCHAR,
+    user_lastname VARCHAR,
+    user_username VARCHAR,
+    assets JSON
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        p.id as post_id,
+        p.content,
+        p.created_at,
+        u.id as user_id,
+        u.firstname as user_firstname,
+        u.lastname as user_lastname,
+        u.username as user_username,
+        COALESCE(
+            json_agg(
+                json_build_object(
+                    'id', pa.id,
+                    'url', pa.url,
+                    'mimetype', pa.mimetype,
+                    'file_size_bytes', pa.file_size_bytes,
+                    'position', pa.position
+                ) ORDER BY pa.position
+            ) FILTER (WHERE pa.id IS NOT NULL),
+            '[]'::json
+        ) as assets
+    FROM public.post p
+    LEFT JOIN public."user" u ON p.user_id = u.id
+    LEFT JOIN public.post_assets pa ON p.id = pa.post_id AND pa.is_active = true
+    WHERE p.is_blocked = false 
+      AND u.is_blocked = false 
+      AND u.is_active = true
+      AND p.content ILIKE '%' || p_search_query || '%'
+    GROUP BY p.id, p.content, p.created_at, u.id, u.firstname, u.lastname, u.username
+    ORDER BY p.created_at DESC
+    LIMIT p_limit
+    OFFSET p_offset;
+END;
+$$;

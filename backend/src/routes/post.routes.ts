@@ -5,6 +5,7 @@ import {
   deletePostController,
   getPostController,
   getPostsController,
+  searchPostsController,
 } from "../controllers/post.controller.js";
 import { uploadPostImages } from "../middlewares/multer.middleware.js";
 
@@ -15,6 +16,9 @@ router.get("/", getPostsController);
 
 // Get single post
 router.get("/get/:postId", getPostController);
+
+// Search posts
+router.get("/search", searchPostsController);
 
 // Create a new post
 router.post(
