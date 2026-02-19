@@ -223,12 +223,12 @@ export const createPostAssets = async (assets: PostAssetData[]): Promise<void> =
   }
 };
 
-export const getPost = async (postId: string): Promise<PostResponse | null> => {
+export const getPost = async (postId: string, userId: string): Promise<PostResponse | null> => {
   try {
     logger.debug('Getting post', { postId });
     const result = await pool.query(
-      "SELECT * FROM fn_get_post($1)",
-      [postId]
+      "SELECT * FROM fn_get_post($1, $2)",
+      [postId, userId]
     );
 
     const post = result.rows[0];
@@ -245,6 +245,7 @@ export const getPost = async (postId: string): Promise<PostResponse | null> => {
       updatedAt: post.updated_at ? post.updated_at.toISOString() : null,
       likeCount: post.like_count,
       commentCount: post.comment_count,
+      isLiked: post.is_liked,
       user: {
         userId: post.user_id,
         firstName: post.user_firstname || '',
@@ -265,13 +266,13 @@ export const getPost = async (postId: string): Promise<PostResponse | null> => {
   }
 };
 
-export const getPosts = async (limit: number = 20, offset: number = 0): Promise<PostsResponse> => {
+export const getPosts = async (userId: string, limit: number = 20, offset: number = 0): Promise<PostsResponse> => {
   try {
     logger.debug('Getting posts', { limit, offset });
 
     const result = await pool.query(
-      "SELECT * FROM fn_get_posts($1, $2)",
-      [limit, offset]
+      "SELECT * FROM fn_get_posts($1, $2, $3)",
+      [userId, limit, offset]
     );
 
     const postsData = result.rows;
@@ -295,6 +296,7 @@ export const getPosts = async (limit: number = 20, offset: number = 0): Promise<
       updatedAt: null, // Not returned in fn_get_posts
       likeCount: post.like_count,
       commentCount: post.comment_count,
+      isLiked: post.is_liked,
       user: {
         userId: post.user_id,
         firstName: post.user_firstname || '',
@@ -327,7 +329,7 @@ export const getPosts = async (limit: number = 20, offset: number = 0): Promise<
   }
 };
 
-export const searchPosts = async (searchQuery: string, limit: number = 20, offset: number = 0): Promise<PostsResponse> => {
+export const searchPosts = async (searchQuery: string, userId: string, limit: number = 20, offset: number = 0): Promise<PostsResponse> => {
   try {
     logger.debug('Searching posts', { searchQuery, limit, offset });
 
@@ -339,8 +341,8 @@ export const searchPosts = async (searchQuery: string, limit: number = 20, offse
     }
 
     const result = await pool.query(
-      "SELECT * FROM fn_search_posts($1, $2, $3)",
-      [searchQuery.trim(), limit, offset]
+      "SELECT * FROM fn_search_posts($1, $2, $3, $4)",
+      [searchQuery.trim(), userId, limit, offset]
     );
 
     const postsData = result.rows;
@@ -364,6 +366,7 @@ export const searchPosts = async (searchQuery: string, limit: number = 20, offse
       updatedAt: null, // Not returned in fn_search_posts
       likeCount: post.like_count,
       commentCount: post.comment_count,
+      isLiked: post.is_liked,
       user: {
         userId: post.user_id,
         firstName: post.user_firstname || '',
@@ -420,7 +423,8 @@ export const getPostComments = async (postId: string, limit: number = 20, offset
         userId: comment.user_id,
         firstName: comment.user_firstname || '',
         lastName: comment.user_lastname || '',
-        username: comment.user_username || ''
+        username: comment.user_username || '',
+        profileImageUrl: comment.user_profile_image_url || null
       }
     }));
 

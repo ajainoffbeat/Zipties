@@ -38,6 +38,7 @@ export interface PostResponse {
   updatedAt: string | null;
   likeCount: number;
   commentCount: number;
+  isLiked: boolean;
   user: {
     userId: string;
     firstName: string;
@@ -77,6 +78,7 @@ export interface PostCommentResponse {
     firstName: string;
     lastName: string;
     username: string;
+    profileImageUrl: string | null;
   };
 }
 

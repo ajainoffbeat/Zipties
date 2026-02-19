@@ -165,11 +165,12 @@ $$;
 -- Purpose: Gets a single post with its assets and user information
 -- Parameters:
 --   p_post_id: UUID - The ID of the post to retrieve
+--   p_user_id: UUID - The ID of the user retrieving the post
 -- Returns: Table with post details including like and comment counts
 -- Author        : OFFBEAT
 -- Created On    : 18/02/2026   
 -- ============================================================================
-CREATE OR REPLACE FUNCTION fn_get_post(p_post_id UUID) RETURNS TABLE(
+CREATE OR REPLACE FUNCTION fn_get_post(p_post_id UUID, p_user_id UUID) RETURNS TABLE(
         post_id UUID,
         content VARCHAR,
         is_blocked BOOLEAN,
@@ -181,7 +182,8 @@ CREATE OR REPLACE FUNCTION fn_get_post(p_post_id UUID) RETURNS TABLE(
         user_username VARCHAR,
         assets JSON,
         like_count INTEGER,
-        comment_count INTEGER
+        comment_count INTEGER,
+        is_liked BOOLEAN
     ) LANGUAGE plpgsql AS $$ BEGIN RETURN QUERY
 SELECT p.id as post_id,
     p.content,
@@ -213,7 +215,16 @@ SELECT p.id as post_id,
         '[]'::json
     ) as assets,
     COUNT(DISTINCT CASE WHEN prt.name = 'like' AND pr.is_active = B'1' THEN pr.id END)::int as like_count,
-    COUNT(DISTINCT pc.id)::int as comment_count
+    COUNT(DISTINCT pc.id)::int as comment_count,
+    EXISTS(
+        SELECT 1
+        FROM public.post_reaction pr_inner
+        LEFT JOIN public.post_reaction_type prt_inner ON pr_inner.post_reaction_type_id = prt_inner.id
+        WHERE pr_inner.post_id = p.id
+            AND pr_inner.user_id = p_user_id
+            AND prt_inner.name = 'like'
+            AND pr_inner.is_active = B'1'
+    ) as is_liked
 FROM public.post p
     LEFT JOIN public."user" u ON p.user_id = u.id
     LEFT JOIN public.post_assets pa ON p.id = pa.post_id AND pa.is_active = true
@@ -239,6 +250,7 @@ $$;
 -- Function: fn_get_posts
 -- Purpose: Gets posts for home page with pagination
 -- Parameters:
+--   p_user_id: UUID - The ID of the user performing the action
 --   p_limit: INTEGER - Number of posts to return
 --   p_offset: INTEGER - Number of posts to skip
 -- Returns: Table with posts and their details including like and comment counts
@@ -246,6 +258,7 @@ $$;
 -- Created On    : 18/02/2026
 -- ============================================================================
 CREATE OR REPLACE FUNCTION fn_get_posts(
+        p_user_id UUID,
         p_limit INTEGER DEFAULT 20,
         p_offset INTEGER DEFAULT 0
     ) RETURNS TABLE(
@@ -258,7 +271,8 @@ CREATE OR REPLACE FUNCTION fn_get_posts(
         user_username VARCHAR,
         assets JSON,
         like_count INTEGER,
-        comment_count INTEGER
+        comment_count INTEGER,
+        is_liked BOOLEAN
     ) LANGUAGE plpgsql AS $$ BEGIN RETURN QUERY
 SELECT p.id as post_id,
     p.content,
@@ -288,7 +302,16 @@ SELECT p.id as post_id,
         '[]'::json
     ) as assets,
     COUNT(DISTINCT CASE WHEN prt.name = 'like' AND pr.is_active = B'1' THEN pr.id END)::int as like_count,
-    COUNT(DISTINCT pc.id)::int as comment_count
+    COUNT(DISTINCT pc.id)::int as comment_count,
+    EXISTS(
+        SELECT 1
+        FROM public.post_reaction pr_inner
+        LEFT JOIN public.post_reaction_type prt_inner ON pr_inner.post_reaction_type_id = prt_inner.id
+        WHERE pr_inner.post_id = p.id
+            AND pr_inner.user_id = p_user_id
+            AND prt_inner.name = 'like'
+            AND pr_inner.is_active = B'1'
+    ) as is_liked
 FROM public.post p
     LEFT JOIN public."user" u ON p.user_id = u.id
     LEFT JOIN public.post_assets pa ON p.id = pa.post_id AND pa.is_active = true
@@ -498,6 +521,7 @@ $$;
 -- Purpose: Searches posts by content with pagination
 -- Parameters:
 --   p_search_query: VARCHAR - The search term to look for in post content
+--   p_user_id: UUID - The ID of the user performing the search
 --   p_limit: INTEGER - Number of posts to return
 --   p_offset: INTEGER - Number of posts to skip
 -- Returns: Table with posts and their details including like and comment counts
@@ -506,6 +530,7 @@ $$;
 -- ============================================================================
 CREATE OR REPLACE FUNCTION fn_search_posts(
         p_search_query VARCHAR,
+        p_user_id UUID,
         p_limit INTEGER DEFAULT 20,
         p_offset INTEGER DEFAULT 0
     ) RETURNS TABLE(
@@ -518,7 +543,8 @@ CREATE OR REPLACE FUNCTION fn_search_posts(
         user_username VARCHAR,
         assets JSON,
         like_count INTEGER,
-        comment_count INTEGER
+        comment_count INTEGER,
+        is_liked BOOLEAN
     ) LANGUAGE plpgsql AS $$ BEGIN RETURN QUERY
 SELECT p.id as post_id,
     p.content,
@@ -548,7 +574,16 @@ SELECT p.id as post_id,
         '[]'::json
     ) as assets,
     COUNT(DISTINCT CASE WHEN prt.name = 'like' AND pr.is_active = B'1' THEN pr.id END)::int as like_count,
-    COUNT(DISTINCT pc.id)::int as comment_count
+    COUNT(DISTINCT pc.id)::int as comment_count,
+    EXISTS(
+        SELECT 1
+        FROM public.post_reaction pr_inner
+        LEFT JOIN public.post_reaction_type prt_inner ON pr_inner.post_reaction_type_id = prt_inner.id
+        WHERE pr_inner.post_id = p.id
+            AND pr_inner.user_id = p_user_id
+            AND prt_inner.name = 'like'
+            AND pr_inner.is_active = B'1'
+    ) as is_liked
 FROM public.post p
     LEFT JOIN public."user" u ON p.user_id = u.id
     LEFT JOIN public.post_assets pa ON p.id = pa.post_id AND pa.is_active = true
@@ -626,7 +661,8 @@ RETURNS TABLE(
     blocked_at TIMESTAMP,
     user_firstname VARCHAR,
     user_lastname VARCHAR,
-    user_username VARCHAR
+    user_username VARCHAR,
+    user_profile_image_url TEXT
 ) 
 LANGUAGE plpgsql 
 AS $$
@@ -644,7 +680,8 @@ BEGIN
         pc.blocked_at,
         u.firstname AS user_firstname,
         u.lastname AS user_lastname,
-        u.username AS user_username
+        u.username AS user_username,
+        u.profile_image_url
     FROM public.post_comment pc
     LEFT JOIN public."user" u ON pc.user_id = u.id
     WHERE pc.post_id = p_post_id
