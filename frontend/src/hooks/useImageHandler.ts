@@ -4,6 +4,8 @@ export function useImageHandler() {
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [existingAssetIds, setExistingAssetIds] = useState<string[]>([]);
+  const [removedAssetIds, setRemovedAssetIds] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const readFiles = (incoming: FileList | File[]) => {
@@ -18,18 +20,28 @@ export function useImageHandler() {
     });
   };
 
-    const setInitialPreviews = (urls: string[]) => {
+  const setInitialPreviews = (urls: string[], assetIds: string[] = []) => {
     setPreviews(urls);
+    setExistingAssetIds(assetIds);
   };
 
   const remove = (index: number) => {
+    // Check if this is an existing image (has an asset ID)
+    const assetId = existingAssetIds[index];
+    if (assetId) {
+      setRemovedAssetIds((prev) => [...prev, assetId]);
+    }
+
     setFiles((f) => f.filter((_, i) => i !== index));
     setPreviews((p) => p.filter((_, i) => i !== index));
+    setExistingAssetIds((ids) => ids.filter((_, i) => i !== index));
   };
 
   const reset = () => {
     setFiles([]);
     setPreviews([]);
+    setExistingAssetIds([]);
+    setRemovedAssetIds([]);
   };
 
   return {
@@ -41,6 +53,7 @@ export function useImageHandler() {
     setInitialPreviews,
     remove,
     reset,
+    removedAssetIds,
     inputRef,
   };
 }

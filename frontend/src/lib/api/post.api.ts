@@ -5,7 +5,6 @@ export const createPost = async (content: string, imageFiles: File[]) => {
     const formData = new FormData();
     formData.append("content", content);
     imageFiles.forEach((file) => formData.append("images", file));
-    console.log("Form DATA", formData)
     const res = await api.post("/posts/create", formData, {
         headers: { "Content-Type": "multipart/form-data" },
     });
@@ -31,10 +30,11 @@ export const deletePost = async (postId: string) => {
 };
 
 /** Update a post */
-export const editPost = async (postId: string, content: string, imageFiles: File[] = []) => {
+export const editPost = async (postId: string, content: string, imageFiles: File[] = [], removedImageIds: string[] = []) => {
     const formData = new FormData();
     formData.append("content", content);
     imageFiles.forEach((file) => formData.append("images", file));
+    removedImageIds.forEach((id) => formData.append("deleteFilesIds[]", id));
     
     const res = await api.put(`/posts/edit/${postId}`, formData, {
         headers: { "Content-Type": "multipart/form-data" },

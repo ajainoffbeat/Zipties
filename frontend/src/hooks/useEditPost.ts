@@ -5,7 +5,7 @@ import { usePostStore } from "@/store/usePostStore";
 
 export function useEditPost(postId?: string) {
   const navigate = useNavigate();
-  const { posts, getPost, editPost } = usePostStore();
+  const { posts, getPost, editPost, fetchPosts } = usePostStore();
 
   const [content, setContent] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +39,7 @@ export function useEditPost(postId?: string) {
     }
   };
 
-  const submit = async (files: File[]) => {
+  const submit = async (files: File[], removedImageIds?: string[]) => {
     const trimmed = content.trim();
 
     if (!trimmed) {
@@ -56,7 +56,11 @@ export function useEditPost(postId?: string) {
 
     try {
       setLoading(true);
-      await editPost(postId, trimmed, files);
+      await editPost(postId, trimmed, files, removedImageIds);
+      
+      // Refresh feed data to get the latest updates
+      await fetchPosts(true);
+      
       navigate("/feed");
     } catch (err: any) {
       setError(err?.response?.data?.message ?? "Failed to update post.");

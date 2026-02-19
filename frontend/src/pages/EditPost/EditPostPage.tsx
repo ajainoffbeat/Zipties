@@ -24,8 +24,11 @@ export default function EditPostPage() {
       const urls = [...existing.assets]
         .sort((a, b) => a.position - b.position)
         .map(a => a.url);
+      const assetIds = [...existing.assets]
+        .sort((a, b) => a.position - b.position)
+        .map(a => a.id);
 
-      images.setInitialPreviews(urls);
+      images.setInitialPreviews(urls, assetIds);
     }
   }, [postId, posts]);
 
@@ -45,7 +48,7 @@ export default function EditPostPage() {
           onCancel={() => navigate("/feed")}
           loading={post.loading}
           error={post.error}
-          onSubmit={() => post.submit(images.files)}
+          onSubmit={() => post.submit(images.files, images.removedAssetIds)}
         />
       </div>
     </AppLayout>

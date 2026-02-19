@@ -48,7 +48,7 @@ interface PostState {
     fetchPosts: (reset?: boolean) => Promise<void>;
     getPost: (postId: string) => Promise<Post>;
     createPost: (content: string, imageFiles: File[]) => Promise<void>;
-    editPost: (postId: string, content: string, imageFiles: File[]) => Promise<void>;
+    editPost: (postId: string, content: string, imageFiles: File[], removedImageIds?: string[]) => Promise<void>;
     deletePost: (postId: string) => Promise<void>;
     toggleLike: (postId: string) => void;
     clearError: () => void;
@@ -136,14 +136,21 @@ export const usePostStore = create<PostState>((set, get) => ({
         }
     },
 
-    editPost: async (postId, content, imageFiles) => {
+    editPost: async (postId, content, imageFiles, removedImageIds = []) => {
         try {
-            await editPostApi(postId, content, imageFiles);
-            // Update post in local state
+            const response = await editPostApi(postId, content, imageFiles, removedImageIds);
+            
+            // Update post in local state with the response data
             set((state) => ({
                 posts: state.posts.map((p) =>
                     p.postId === postId
-                        ? { ...p, content, updatedAt: new Date().toISOString() }
+                        ? { 
+                            ...p, 
+                            content, 
+                            updatedAt: new Date().toISOString(),
+                            // Update assets with the response from API
+                            assets: response.assets || p.assets
+                        }
                         : p
                 ),
             }));
