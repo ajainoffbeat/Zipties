@@ -1,23 +1,71 @@
+
 import { memo, useMemo, useCallback, useState } from "react";
-import { Flag, Heart, MessageCircle, MoreHorizontal, Pencil, Trash2, User } from "lucide-react";
+import { Flag, Heart, MessageCircle, MoreHorizontal, Pencil, Trash2, User, Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/utils";
 import { usePostStore } from "@/store/usePostStore";
 import PostMediaGrid from "@/components/media/PostMediaGrid";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useDeletePost } from "@/hooks/useDeletePost";
 import { useNavigate } from "react-router-dom";
 import { useProfileStore } from "@/store/useProfileStore";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { InlineComments } from "@/components/comments/InlineComments";
 import { formatPostDate } from "@/lib/utils/formatTime";
+import { ReportPostDialog } from "@/components/feed/ReportPostDialog";
+import {  toast } from "@/hooks/use-toast";
+import { blockUser } from "@/lib/api/user.api";
 
 function FeedPost({ post }) {
   const navigate = useNavigate();
   const toggleLike = usePostStore((s) => s.toggleLike);
+  const blockPostAction = usePostStore((s) => s.blockPost);
+  const reportPostAction = usePostStore((s) => s.reportPost);
   const [showComments, setShowComments] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [isReporting, setIsReporting] = useState(false);
+
+  const handleReport = async (reason: string) => {
+    setIsReporting(true);
+    try {
+      await reportPostAction(post.postId, reason);
+      toast({
+        title: "Post reported successfully",
+        description: "The post has been reported for review.",
+      });
+      setReportDialogOpen(false);
+    } finally {
+      setIsReporting(false);
+    }
+  };
+
+  const handleBlockPost = async () => {
+    if (window.confirm("Are you sure you want to block this post? It will be hidden from your feed.")) {
+      await blockPostAction(post.postId);
+    }
+  };
+
+  const handleBlockUser = async () => {
+    if (window.confirm(`Are you sure you want to block ${post.user.firstName}? You will no longer see their posts.`)) {
+      try {
+        await blockUser({ user_blocked: post.user.userId, is_blocking: true });
+        toast({
+          title: "User blocked successfully",
+          description: `You will no longer see posts from ${post.user.firstName}`,
+        });
+        usePostStore.getState().fetchPosts(true);
+
+      } catch (e) {
+        console.error(e);
+        toast({
+          title: "Failed to block user",
+          description: "Please try again",
+          variant: "destructive",
+        });
+      }
+    }
+  };
 
   const imageUrls = useMemo(
     () =>
@@ -35,6 +83,7 @@ function FeedPost({ post }) {
   const { profile } = useProfileStore();
   const initials = (post.user.firstName?.[0] ?? "") + (post.user.lastName?.[0] ?? "");
   const isOwner = post.user.userId === profile?.id;
+
   return (
     <article
       className="bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
@@ -59,60 +108,53 @@ function FeedPost({ post }) {
             </span>
           </div>
         </div>
-        {isOwner ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-muted-foreground shrink-0 -mt-1 -mr-1">
-                <MoreHorizontal className="w-5 h-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem
-                className="gap-2 cursor-pointer"
-                onClick={() => navigate(`/edit-post/${post.postId}`)}
-              >
-                <Pencil className="w-4 h-4" />
-                Edit post
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
-                onClick={() => deleteFlow.setPostId(post.postId)}
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete post
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : (
-          <Button variant="ghost" size="icon" className="text-muted-foreground shrink-0 -mt-1 -mr-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-muted-foreground shrink-0 -mt-1 -mr-1">
-                <MoreHorizontal className="w-5 h-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem
-                className="gap-2 cursor-pointer"
-                onClick={() => navigate(`/edit-post/${post.postId}`)}
-              >
-                <Flag className="w-4 h-4" />
-                Report Post
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
-                onClick={() => deleteFlow.setPostId(post.postId)}
-              >
-                <User className="w-4 h-4" />
-                Block User
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-            
-          </DropdownMenu>
-          </Button>
-        )}
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="text-muted-foreground shrink-0 -mt-1 -mr-1">
+              <MoreHorizontal className="w-5 h-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            {isOwner ? (
+              <>
+                <DropdownMenuItem
+                  className="gap-2 cursor-pointer"
+                  onClick={() => navigate(`/edit-post/${post.postId}`)}
+                >
+                  <Pencil className="w-4 h-4" />
+                  Edit post
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+                  onClick={() => deleteFlow.setPostId(post.postId)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete post
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <>
+                <DropdownMenuItem
+                  className="gap-2 cursor-pointer"
+                  onClick={() => setReportDialogOpen(true)}
+                >
+                  <Flag className="w-4 h-4" />
+                  Report Post
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+                  onClick={handleBlockUser}
+                >
+                  <User className="w-4 h-4" />
+                  Block User
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Text */}
@@ -139,19 +181,15 @@ function FeedPost({ post }) {
           <Heart className={cn("w-4 h-4 mr-1.5 transition-all", post.isLiked && "fill-current scale-110")} />
           <span className="text-sm font-medium">{post.likes}</span>
         </Button>
-        <Button 
-          variant="ghost" 
-          size="sm" 
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={handleCommentClick}
           className="text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
         >
           <MessageCircle className="w-4 h-4 mr-1.5" />
           <span className="text-sm font-medium">{post.comments}</span>
         </Button>
-        {/* <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
-          <Share2 className="w-4 h-4 mr-1.5" />
-          <span className="text-sm font-medium">{post.shares}</span>
-        </Button> */}
 
         <ConfirmDialog
           open={!!deleteFlow.postId}
@@ -172,6 +210,13 @@ function FeedPost({ post }) {
         commentCount={post.comments}
         isOpen={showComments}
         onClose={() => setShowComments(false)}
+      />
+
+      <ReportPostDialog
+        isOpen={reportDialogOpen}
+        onClose={() => setReportDialogOpen(false)}
+        onSubmit={handleReport}
+        isSubmitting={isReporting}
       />
     </article>
   );

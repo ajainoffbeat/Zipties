@@ -1,4 +1,4 @@
-import type { CreatePostRequest, EditPostRequest, UpdatePostRequest, PostAssetData, PostResponse, PostsResponse, PostCommentsResponse, CreateCommentRequest } from "../@types/post.types.js";
+import type { CreatePostRequest, EditPostRequest, UpdatePostRequest, PostAssetData, PostResponse, PostsResponse, PostCommentsResponse, CreateCommentRequest, ReportPostRequest } from "../@types/post.types.js";
 import { pool } from "../config/db.js";
 import { logger } from "../utils/logger.js";
 import { AppError } from "../utils/response/appError.js";
@@ -499,6 +499,56 @@ export const togglePostLike = async (userId: string, postId: string): Promise<bo
     logger.error('Failed to toggle like', {
       userId,
       postId,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    throw error;
+  }
+};
+
+export const blockPost = async (userId: string, postId: string): Promise<boolean> => {
+  try {
+    logger.debug('Blocking post', { userId, postId });
+
+    // We don't check if post exists here because the stored procedure handles it (or rather, FK will fail if not exists)
+    // But it's safer to rely on FK error handling or check existence.
+    // The stored proc `fn_block_post` we created does an insert.
+
+    const result = await pool.query(
+      "SELECT fn_block_post($1, $2) AS success",
+      [userId, postId]
+    );
+
+    const success = result.rows[0]?.success === true;
+    logger.info('Post blocked successfully', { userId, postId, success });
+
+    return success;
+  } catch (error) {
+    logger.error('Failed to block post', {
+      userId,
+      postId,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    throw error;
+  }
+};
+
+export const reportPost = async (reportData: ReportPostRequest): Promise<boolean> => {
+  try {
+    logger.debug('Reporting post', { userId: reportData.userId, postId: reportData.postId });
+
+    const result = await pool.query(
+      "SELECT fn_report_post($1, $2, $3) AS success",
+      [reportData.userId, reportData.postId, reportData.comment]
+    );
+
+    const success = result.rows[0]?.success === true;
+    logger.info('Post reported successfully', { userId: reportData.userId, postId: reportData.postId, success });
+
+    return success;
+  } catch (error) {
+    logger.error('Failed to report post', {
+      userId: reportData.userId,
+      postId: reportData.postId,
       error: error instanceof Error ? error.message : 'Unknown error'
     });
     throw error;

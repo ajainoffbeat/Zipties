@@ -12,6 +12,8 @@ import {
   getPostComments,
   createPostComment,
   togglePostLike,
+  blockPost,
+  reportPost,
 } from "../services/post.service.js";
 import { AppError } from "../utils/response/appError.js";
 import { sendSuccess } from "../utils/response/appSuccess.js";
@@ -195,12 +197,12 @@ export const editPostController = async (
     const files = req.files as Express.Multer.File[];
     let newAssets:
       | Array<{
-          postId: string;
-          url: string;
-          mimetype: string;
-          size: number;
-          userId: string;
-        }>
+        postId: string;
+        url: string;
+        mimetype: string;
+        size: number;
+        userId: string;
+      }>
       | undefined;
 
     if (files && Array.isArray(files) && files.length > 0) {
@@ -618,6 +620,98 @@ export const togglePostLikeController = async (
     });
   } catch (err) {
     logger.error("Error in togglePostLikeController", { error: err });
+    next(err);
+  }
+};
+
+export const blockPostController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const token = extractBearerToken(req.headers.authorization);
+    const decoded = decodeToken(token);
+
+    if (!decoded || !decoded.userId) {
+      throw new AppError(401, RESPONSE_MESSAGES[RESPONSE_CODES.UNAUTHORIZED], {
+        code: RESPONSE_CODES.UNAUTHORIZED,
+        success: false,
+      });
+    }
+
+    const userId = decoded.userId as string;
+    const postId = req.params.postId as string;
+
+    if (!postId) {
+      throw new AppError(400, "Post ID is required", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    const success = await blockPost(userId, postId);
+
+    return sendSuccess(res, {
+      status: 200,
+      message: "Post blocked successfully",
+      success,
+      code: RESPONSE_CODES.SUCCESS,
+    });
+  } catch (err) {
+    logger.error("Error in blockPostController", { error: err });
+    next(err);
+  }
+};
+
+export const reportPostController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const token = extractBearerToken(req.headers.authorization);
+    const decoded = decodeToken(token);
+
+    if (!decoded || !decoded.userId) {
+      throw new AppError(401, RESPONSE_MESSAGES[RESPONSE_CODES.UNAUTHORIZED], {
+        code: RESPONSE_CODES.UNAUTHORIZED,
+        success: false,
+      });
+    }
+
+    const userId = decoded.userId as string;
+    const postId = req.params.postId as string;
+    const { comment } = req.body;
+
+    if (!postId) {
+      throw new AppError(400, "Post ID is required", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    if (!comment || typeof comment !== "string" || comment.trim().length === 0) {
+      throw new AppError(400, "Comment is required", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    const success = await reportPost({
+      userId,
+      postId,
+      comment: comment.trim(),
+    });
+
+    return sendSuccess(res, {
+      status: 200,
+      message: "Post reported successfully",
+      success,
+      code: RESPONSE_CODES.SUCCESS,
+    });
+  } catch (err) {
+    logger.error("Error in reportPostController", { error: err });
     next(err);
   }
 };
