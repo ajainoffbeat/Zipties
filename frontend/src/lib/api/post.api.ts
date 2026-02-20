@@ -77,3 +77,9 @@ export const reportPost = async (postId: string, comment: string) => {
     const res = await api.post(`/posts/report/${postId}`, { comment });
     return res.data;
 };
+
+/** Report a comment */
+export const reportComment = async (commentId: string, reason: string) => {
+    const res = await api.post(`/posts/comment/report/${commentId}`, { reason });
+    return res.data;
+};

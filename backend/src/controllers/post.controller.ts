@@ -3,17 +3,18 @@ import fs from "fs/promises";
 import { decodeToken, extractBearerToken } from "../utils/jwt.util.js";
 import {
   createPost,
-  createPostAssets,
-  editPost,
-  deletePost,
-  getPost,
   getPosts,
+  getPost,
+  deletePost,
+  editPost,
   searchPosts,
   getPostComments,
   createPostComment,
   togglePostLike,
   blockPost,
   reportPost,
+  reportComment,
+  createPostAssets,
 } from "../services/post.service.js";
 import { AppError } from "../utils/response/appError.js";
 import { sendSuccess } from "../utils/response/appSuccess.js";
@@ -712,6 +713,58 @@ export const reportPostController = async (
     });
   } catch (err) {
     logger.error("Error in reportPostController", { error: err });
+    next(err);
+  }
+};
+
+export const reportCommentController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const token = extractBearerToken(req.headers.authorization);
+    const decoded = decodeToken(token);
+
+    if (!decoded || !decoded.userId) {
+      throw new AppError(401, RESPONSE_MESSAGES[RESPONSE_CODES.UNAUTHORIZED], {
+        code: RESPONSE_CODES.UNAUTHORIZED,
+        success: false,
+      });
+    }
+
+    const userId = decoded.userId as string;
+    const commentId = req.params.commentId as string;
+    const { reason } = req.body;
+
+    if (!commentId) {
+      throw new AppError(400, "Comment ID is required", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    if (!reason || typeof reason !== "string" || reason.trim().length === 0) {
+      throw new AppError(400, "Reason is required and must be a non-empty string", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    const success = await reportComment({
+      userId,
+      commentId,
+      reason: reason.trim(),
+    });
+
+    return sendSuccess(res, {
+      status: 200,
+      message: "Comment reported successfully",
+      success,
+      code: RESPONSE_CODES.SUCCESS,
+    });
+  } catch (err) {
+    logger.error("Error in reportCommentController", { error: err });
     next(err);
   }
 };

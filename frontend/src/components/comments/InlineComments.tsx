@@ -1,10 +1,20 @@
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, Send, X } from "lucide-react";
+import { Loader2, Send, X, MoreHorizontal, Flag } from "lucide-react";
+import { useState } from "react";
 import { useProfileStore } from "@/store/useProfileStore";
 import { useInlineComments } from "@/hooks/useInlineComments";
 import { formatCommentTime } from "@/lib/utils/formatTime";
+import { ReportCommentDialog } from "./ReportCommentDialog";
+import { reportComment } from "@/lib/api/post.api";
+import { useToast } from "@/hooks/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface InlineCommentsProps {
   postId: string;
@@ -20,6 +30,7 @@ export function InlineComments({
   onClose,
 }: InlineCommentsProps) {
   const { profile } = useProfileStore();
+  const { toast } = useToast();
 
   const {
     comments,
@@ -31,6 +42,38 @@ export function InlineComments({
     loadComments,
     submitComment,
   } = useInlineComments(postId, isOpen);
+
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [isReporting, setIsReporting] = useState(false);
+  const [selectedCommentId, setSelectedCommentId] = useState<string | null>(null);
+
+  const handleReportComment = async (reason: string) => {
+    if (!selectedCommentId) return;
+    
+    setIsReporting(true);
+    try {
+      await reportComment(selectedCommentId, reason);
+      toast({
+        title: "Comment reported successfully",
+        description: "The comment has been reported for review.",
+      });
+      setReportDialogOpen(false);
+      setSelectedCommentId(null);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to report comment. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsReporting(false);
+    }
+  };
+
+  const openReportDialog = (commentId: string) => {
+    setSelectedCommentId(commentId);
+    setReportDialogOpen(true);
+  };
 
   if (!isOpen) return null;
 
@@ -92,6 +135,30 @@ export function InlineComments({
                       {comment.comment}
                     </p>
                   </div>
+                  
+                  {/* Report button - only show for other users' comments */}
+                  {comment.user.id !== profile?.id && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground ml-2"
+                        >
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => openReportDialog(comment.id)}
+                          className="text-red-600 focus:text-white cursor-pointer"
+                        >
+                          <Flag className="w-4 h-4 mr-2" />
+                          Report Comment
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </div>
               </div>
             </div>
@@ -168,6 +235,17 @@ export function InlineComments({
           </div>
         </div>
       </div>
+
+      {/* Report Comment Dialog */}
+      <ReportCommentDialog
+        isOpen={reportDialogOpen}
+        onClose={() => {
+          setReportDialogOpen(false);
+          setSelectedCommentId(null);
+        }}
+        onSubmit={handleReportComment}
+        isSubmitting={isReporting}
+      />
     </div>
   );
 }

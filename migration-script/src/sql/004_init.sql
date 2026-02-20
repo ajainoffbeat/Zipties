@@ -382,6 +382,109 @@ LIMIT p_limit OFFSET p_offset;
 END;
 $function$;
 
+
+
+DROP FUNCTION public.fn_get_posts(uuid, integer, integer);
+
+-- Update fn_get_posts to filter blocked posts and users
+CREATE OR REPLACE FUNCTION public.fn_get_posts(p_user_id uuid, p_limit integer DEFAULT 20, p_offset integer DEFAULT 0)
+ RETURNS TABLE(post_id uuid, content character varying, created_at timestamp without time zone, user_id uuid, user_firstname character varying, user_lastname character varying, user_username character varying, assets json, like_count integer, comment_count integer, is_liked boolean)
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+RETURN QUERY
+SELECT 
+    p.id AS post_id,
+    p.content,
+    p.created_at,
+    u.id AS user_id,
+    u.firstname,
+    u.lastname,
+    u.username,
+
+    -- ✅ Assets aggregated separately
+    COALESCE(pa.assets, '[]'::json) AS assets,
+
+    -- ✅ Likes counted separately
+    COALESCE(lc.like_count, 0) AS like_count,
+
+    -- ✅ Comments counted separately
+    COALESCE(cc.comment_count, 0) AS comment_count,
+
+    -- ✅ Is liked check
+    EXISTS (
+        SELECT 1
+        FROM public.post_reaction pr_inner
+        JOIN public.post_reaction_type prt_inner 
+            ON pr_inner.post_reaction_type_id = prt_inner.id
+        WHERE pr_inner.post_id = p.id
+          AND pr_inner.user_id = p_user_id
+          AND prt_inner.name = 'like'
+          AND pr_inner.is_active = B'1'
+    ) AS is_liked
+
+FROM public.post p
+JOIN public."user" u 
+    ON p.user_id = u.id
+
+-- 🔥 Aggregate assets separately
+LEFT JOIN LATERAL (
+    SELECT json_agg(
+        json_build_object(
+            'id', pa.id,
+            'url', pa.url,
+            'mimetype', pa.mimetype,
+            'file_size_bytes', pa.file_size_bytes,
+            'position', pa.position
+        )
+        ORDER BY pa.position
+    ) AS assets
+    FROM public.post_assets pa
+    WHERE pa.post_id = p.id
+      AND pa.is_active = true
+) pa ON TRUE
+
+-- 🔥 Count likes separately
+LEFT JOIN LATERAL (
+    SELECT COUNT(*)::int AS like_count
+    FROM public.post_reaction pr
+    JOIN public.post_reaction_type prt 
+        ON pr.post_reaction_type_id = prt.id
+    WHERE pr.post_id = p.id
+      AND prt.name = 'like'
+      AND pr.is_active = B'1'
+) lc ON TRUE
+
+-- 🔥 Count comments separately
+LEFT JOIN LATERAL (
+    SELECT COUNT(*)::int AS comment_count
+    FROM public.post_comment pc
+    WHERE pc.post_id = p.id
+      AND pc.is_blocked = false
+) cc ON TRUE
+
+WHERE p.is_blocked = false
+  AND u.is_blocked = false
+  AND u.is_active = true
+  
+  -- 🚫 EXCLUDE POSTS FROM USERS BLOCKED BY CURRENT USER
+  AND NOT EXISTS (
+      SELECT 1 FROM public.user_report ur
+      WHERE ur.blocked_user_id = p.user_id AND ur.user_id = p_user_id
+  )
+
+  -- 🚫 EXCLUDE POSTS FROM USERS WHO BLOCKED CURRENT USER
+  AND NOT EXISTS (
+      SELECT 1 FROM public.user_report ur
+      WHERE ur.blocked_user_id = p_user_id AND ur.user_id = p.user_id
+  )
+
+ORDER BY p.created_at DESC
+LIMIT p_limit OFFSET p_offset;
+
+END;
+$function$;
+
 -- ============================================================================
 -- Function: fn_deactivate_post_assets
 -- Purpose: Deactivates (soft deletes) specified post assets
@@ -662,6 +765,98 @@ ORDER BY p.created_at DESC
 LIMIT p_limit OFFSET p_offset;
 END;
 $function$;
+
+
+DROP FUNCTION public.fn_search_posts(character varying, uuid, integer, integer);
+
+-- Update fn_search_posts to filter blocked posts and users
+CREATE OR REPLACE FUNCTION public.fn_search_posts(p_search_query character varying, p_user_id uuid, p_limit integer DEFAULT 20, p_offset integer DEFAULT 0)
+ RETURNS TABLE(post_id uuid, content character varying, created_at timestamp without time zone, user_id uuid, user_firstname character varying, user_lastname character varying, user_username character varying, assets json, like_count integer, comment_count integer, is_liked boolean)
+ LANGUAGE plpgsql
+AS $function$ 
+BEGIN 
+RETURN QUERY
+SELECT p.id as post_id,
+    p.content,
+    p.created_at,
+    u.id as user_id,
+    u.firstname as user_firstname,
+    u.lastname as user_lastname,
+    u.username as user_username,
+    COALESCE(
+        json_agg(
+            json_build_object(
+                'id',
+                pa.id,
+                'url',
+                pa.url,
+                'mimetype',
+                pa.mimetype,
+                'file_size_bytes',
+                pa.file_size_bytes,
+                'position',
+                pa.position
+            )
+            ORDER BY pa.position
+        ) FILTER (
+            WHERE pa.id IS NOT NULL
+        ),
+        '[]'::json
+    ) as assets,
+    COUNT(DISTINCT CASE WHEN prt.name = 'like' AND pr.is_active = B'1' THEN pr.id END)::int as like_count,
+    COUNT(DISTINCT pc.id)::int as comment_count,
+    EXISTS(
+        SELECT 1
+        FROM public.post_reaction pr_inner
+        LEFT JOIN public.post_reaction_type prt_inner ON pr_inner.post_reaction_type_id = prt_inner.id
+        WHERE pr_inner.post_id = p.id
+            AND pr_inner.user_id = p_user_id
+            AND prt_inner.name = 'like'
+            AND pr_inner.is_active = B'1'
+    ) as is_liked
+FROM public.post p
+    LEFT JOIN public."user" u ON p.user_id = u.id
+    LEFT JOIN public.post_assets pa ON p.id = pa.post_id AND pa.is_active = true
+    LEFT JOIN public.post_reaction pr ON p.id = pr.post_id AND pr.is_active = B'1'
+    LEFT JOIN public.post_reaction_type prt ON pr.post_reaction_type_id = prt.id AND prt.name = 'like' AND prt.is_active = B'1'
+    LEFT JOIN public.post_comment pc ON p.id = pc.post_id AND pc.is_blocked = false
+WHERE p.is_blocked = false
+    AND u.is_blocked = false
+    AND u.is_active = true
+    AND p.content ILIKE '%' || p_search_query || '%'
+
+    -- 🚫 EXCLUDE POSTS BLOCKED BY CURRENT USER
+    AND NOT EXISTS (
+        SELECT 1 FROM public.post_block pb 
+        WHERE pb.post_id = p.id AND pb.user_id = p_user_id
+    )
+
+    -- 🚫 EXCLUDE POSTS FROM USERS BLOCKED BY CURRENT USER
+    AND NOT EXISTS (
+        SELECT 1 FROM public.user_report ur
+        WHERE ur.blocked_user_id = p.user_id AND ur.user_id = p_user_id
+    )
+
+    -- 🚫 EXCLUDE POSTS FROM USERS WHO BLOCKED CURRENT USER
+    AND NOT EXISTS (
+        SELECT 1 FROM public.user_report ur
+        WHERE ur.blocked_user_id = p_user_id AND ur.user_id = p.user_id
+    )
+
+GROUP BY p.id,
+    p.content,
+    p.created_at,
+    u.id,
+    u.firstname,
+    u.lastname,
+    u.username
+ORDER BY p.created_at DESC
+LIMIT p_limit OFFSET p_offset;
+END;
+$function$;
+
+
+
 -- ============================================================================
 -- Function: fn_get_post_asset_urls_by_ids
 -- Purpose: Gets the URLs of specific active assets for a post
@@ -891,5 +1086,256 @@ BEGIN
         p_user_id
     );
     RETURN TRUE;
+END;
+$function$;
+
+
+CREATE OR REPLACE FUNCTION public.fn_report_comment(
+    p_post_comment_id UUID,
+    p_reason TEXT,
+    p_blocked_user_id UUID
+)
+RETURNS UUID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_report_id UUID;
+BEGIN
+    -- Optional: prevent duplicate reports by same user
+    IF EXISTS (
+        SELECT 1 
+        FROM public.post_comment_report 
+        WHERE post_comment_id = p_post_comment_id
+          AND blocked_user_id = p_blocked_user_id
+    ) THEN
+        RAISE EXCEPTION 'User has already reported this comment';
+    END IF;
+
+    INSERT INTO public.post_comment_report (
+        post_comment_id,
+        comment,
+        blocked_user_id,
+        report_status_id
+    )
+    VALUES (
+        p_post_comment_id,
+        p_reason,
+        p_blocked_user_id,
+        NULL
+    )
+    RETURNING id INTO v_report_id;
+
+    RETURN v_report_id;
+END;
+$$;
+
+DROP FUNCTION public.fn_get_user_profile(uuid, uuid);
+
+-- Update fn_get_user_profile to include follower/following counts and follow status
+CREATE OR REPLACE FUNCTION public.fn_get_user_profile(p_current_user_id uuid, p_user_id uuid)
+ RETURNS TABLE(
+    id uuid,
+    first_name character varying,
+    last_name character varying,
+    username character varying,
+    email character varying,
+    bio text,
+    profile_image_url character varying,
+    city_id uuid,
+    city_name character varying,
+    interests character varying,
+    tags character varying,
+    joined_date timestamp without time zone,
+    isblocked boolean,
+    followers_count integer,
+    following_count integer,
+    is_following boolean
+ )
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+RETURN QUERY
+SELECT 
+    u.id,
+    u.firstname AS first_name,
+    u.lastname AS last_name,
+    u.username,
+    u.email,
+    u.bio,
+    u.profileimageurl AS profile_image_url,
+    u.city_id AS city_id,
+    c.name AS city_name,
+    u.interests,
+    u.tags,
+    u.created_at AS joined_date,
+    -- Check if current user has blocked this user or vice versa
+    EXISTS (
+        SELECT 1 FROM public.user_report ur 
+        WHERE (ur.user_id = p_current_user_id AND ur.blocked_user_id = p_user_id)
+        OR (ur.user_id = p_user_id AND ur.blocked_user_id = p_current_user_id)
+    ) AS isblocked,
+    -- Follower count (users who follow this user)
+    COALESCE(fc.follower_count, 0) AS followers_count,
+    -- Following count (users this user follows)
+    COALESCE(foc.following_count, 0) AS following_count,
+    -- Is current user following this profile user?
+    public.fn_is_following(p_current_user_id, p_user_id) AS is_following
+FROM public."user" u
+LEFT JOIN public.city c ON u.city_id = c.id
+-- Get follower count (count of records where this user is followed)
+LEFT JOIN LATERAL (
+    SELECT COUNT(*)::integer as follower_count
+    FROM public.follower 
+    WHERE followed_id = p_user_id
+) fc ON TRUE
+-- Get following count (count of records where this user follows others)
+LEFT JOIN LATERAL (
+    SELECT COUNT(*)::integer as following_count
+    FROM public.follower 
+    WHERE follower_id = p_user_id
+) foc ON TRUE
+WHERE u.id = p_user_id
+  AND u.is_active = true;
+
+END;
+$function$;
+
+
+-- Create indexes for performance on existing follower table
+CREATE INDEX IF NOT EXISTS idx_follower_follower_id ON public.follower(follower_id);
+CREATE INDEX IF NOT EXISTS idx_follower_followed_id ON public.follower(followed_id);
+CREATE INDEX IF NOT EXISTS idx_follower_created_at ON public.follower(created_at);
+
+-- Add unique constraint to prevent duplicate follows (using DO block for compatibility)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'unique_follower_followed' 
+        AND conrelid = 'public.follower'::regclass
+    ) THEN
+        ALTER TABLE public.follower 
+        ADD CONSTRAINT unique_follower_followed 
+        UNIQUE(follower_id, followed_id);
+    END IF;
+END $$;
+
+-- Function to follow a user (using existing follower table)
+CREATE OR REPLACE FUNCTION public.fn_follow_user(p_follower_id uuid, p_followed_id uuid)
+ RETURNS TABLE(success boolean, message text, follow_id uuid, followed_at timestamp without time zone)
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+    follow_record_id uuid;
+BEGIN
+    -- Validate inputs
+    IF p_follower_id IS NULL OR p_followed_id IS NULL THEN
+        RETURN QUERY SELECT FALSE, 'Both user IDs are required', NULL::uuid, NULL::timestamp;
+        RETURN;
+    END IF;
+    
+    -- Prevent users from following themselves
+    IF p_follower_id = p_followed_id THEN
+        RETURN QUERY SELECT FALSE, 'Users cannot follow themselves', NULL::uuid, NULL::timestamp;
+        RETURN;
+    END IF;
+    
+    -- Check if users exist
+    IF NOT EXISTS (SELECT 1 FROM public."user" WHERE id = p_follower_id AND is_active = true) THEN
+        RETURN QUERY SELECT FALSE, 'Follower user not found', NULL::uuid, NULL::timestamp;
+        RETURN;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM public."user" WHERE id = p_followed_id AND is_active = true) THEN
+        RETURN QUERY SELECT FALSE, 'Followed user not found', NULL::uuid, NULL::timestamp;
+        RETURN;
+    END IF;
+    
+    -- Check if already following
+    IF EXISTS (SELECT 1 FROM public.follower WHERE follower_id = p_follower_id AND followed_id = p_followed_id) THEN
+        RETURN QUERY SELECT FALSE, 'Already following this user', NULL::uuid, NULL::timestamp;
+        RETURN;
+    END IF;
+    
+    -- Create follow relationship
+    INSERT INTO public.follower (follower_id, followed_id, created_at)
+    VALUES (p_follower_id, p_followed_id, NOW())
+    RETURNING id, created_at INTO follow_record_id, followed_at;
+    
+    RETURN QUERY SELECT TRUE, 'User followed successfully', follow_record_id, followed_at;
+END;
+$function$;
+
+-- Function to unfollow a user (using existing follower table)
+CREATE OR REPLACE FUNCTION public.fn_unfollow_user(p_follower_id uuid, p_followed_id uuid)
+ RETURNS TABLE(success boolean, message text)
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+    -- Validate inputs
+    IF p_follower_id IS NULL OR p_followed_id IS NULL THEN
+        RETURN QUERY SELECT FALSE, 'Both user IDs are required';
+        RETURN;
+    END IF;
+    
+    -- Prevent users from unfollowing themselves
+    IF p_follower_id = p_followed_id THEN
+        RETURN QUERY SELECT FALSE, 'Users cannot unfollow themselves';
+        RETURN;
+    END IF;
+    
+    -- Check if follow relationship exists
+    IF NOT EXISTS (SELECT 1 FROM public.follower WHERE follower_id = p_follower_id AND followed_id = p_followed_id) THEN
+        RETURN QUERY SELECT FALSE, 'Not following this user';
+        RETURN;
+    END IF;
+    
+    -- Remove follow relationship
+    DELETE FROM public.follower 
+    WHERE follower_id = p_follower_id AND followed_id = p_followed_id;
+    
+    RETURN QUERY SELECT TRUE, 'User unfollowed successfully';
+END;
+$function$;
+
+-- Function to get follower count (using existing follower table)
+CREATE OR REPLACE FUNCTION public.fn_get_follower_count(p_user_id uuid)
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+    RETURN (
+        SELECT COUNT(*)::integer 
+        FROM public.follower 
+        WHERE followed_id = p_user_id
+    );
+END;
+$function$;
+
+-- Function to get following count (using existing follower table)
+CREATE OR REPLACE FUNCTION public.fn_get_following_count(p_user_id uuid)
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+    RETURN (
+        SELECT COUNT(*)::integer 
+        FROM public.follower 
+        WHERE follower_id = p_user_id
+    );
+END;
+$function$;
+
+-- Function to check if user is following another user (using existing follower table)
+CREATE OR REPLACE FUNCTION public.fn_is_following(p_follower_id uuid, p_followed_id uuid)
+ RETURNS boolean
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 
+        FROM public.follower 
+        WHERE follower_id = p_follower_id AND followed_id = p_followed_id
+    );
 END;
 $function$;

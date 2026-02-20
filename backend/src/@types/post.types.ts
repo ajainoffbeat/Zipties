@@ -36,6 +36,12 @@ export interface ReportPostRequest {
   comment: string;
 }
 
+export interface ReportCommentRequest {
+  userId: string;
+  commentId: string;
+  reason: string;
+}
+
 export interface PostResponse {
   postId: string;
   content: string;

@@ -11,6 +11,7 @@ import {
   togglePostLikeController,
   blockPostController,
   reportPostController,
+  reportCommentController,
 } from "../controllers/post.controller.js";
 import { uploadPostImages } from "../middlewares/multer.middleware.js";
 
@@ -47,10 +48,13 @@ router.put("/edit/:postId", uploadPostImages.array("images", 5), editPostControl
 // Delete a post
 router.delete("/delete/:postId", deletePostController);
 
-export default router;
-
 // Block a post
 router.post("/block/:postId", blockPostController);
 
 // Report a post
 router.post("/report/:postId", reportPostController);
+
+// Report a comment
+router.post("/comment/report/:commentId", reportCommentController);
+
+export default router;

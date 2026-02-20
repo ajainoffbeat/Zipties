@@ -1,4 +1,4 @@
-import type { CreatePostRequest, EditPostRequest, UpdatePostRequest, PostAssetData, PostResponse, PostsResponse, PostCommentsResponse, CreateCommentRequest, ReportPostRequest } from "../@types/post.types.js";
+import type { CreatePostRequest, EditPostRequest, UpdatePostRequest, PostAssetData, PostResponse, PostsResponse, PostCommentsResponse, CreateCommentRequest, ReportPostRequest, ReportCommentRequest } from "../@types/post.types.js";
 import { pool } from "../config/db.js";
 import { logger } from "../utils/logger.js";
 import { AppError } from "../utils/response/appError.js";
@@ -551,6 +551,44 @@ export const reportPost = async (reportData: ReportPostRequest): Promise<boolean
       postId: reportData.postId,
       error: error instanceof Error ? error.message : 'Unknown error'
     });
+    throw error;
+  }
+};
+
+export const reportComment = async (
+  reportData: ReportCommentRequest
+): Promise<boolean> => {
+  try {
+    logger.debug('Reporting comment', {
+      userId: reportData.userId,
+      commentId: reportData.commentId,
+    });
+
+    const result = await pool.query(
+      `SELECT public.fn_report_comment($1, $2, $3) AS report_id`,
+      [
+        reportData.commentId,
+        reportData.reason,
+        reportData.userId,
+      ]
+    );
+
+    const success = !!result.rows[0]?.report_id;
+
+    logger.info('Comment reported successfully', {
+      userId: reportData.userId,
+      commentId: reportData.commentId,
+      success,
+    });
+
+    return success;
+  } catch (error) {
+    logger.error('Failed to report comment', {
+      userId: reportData.userId,
+      commentId: reportData.commentId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+
     throw error;
   }
 };

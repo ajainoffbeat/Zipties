@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { editProfile, getProfileById } from "@/lib/api/user.api";
+import { editProfile, getProfileById, followUser, unfollowUser, getFollowCounts } from "@/lib/api/user.api";
 
 interface Profile {
   name: string;
@@ -17,6 +17,9 @@ interface Profile {
   tags?: string;
   joined_date?: string;
   isblocked?: boolean;
+  followers_count?: number;
+  following_count?: number;
+  is_following?: boolean;
 }
 
 interface ProfileState {
@@ -26,6 +29,9 @@ interface ProfileState {
   fetchProfileById: (id: string) => Promise<void>;
   fetchMyProfile: (id: string) => Promise<void>;
   updateProfile: (data: any) => Promise<void>;
+  followUser: (userId: string) => Promise<void>;
+  unfollowUser: (userId: string) => Promise<void>;
+  fetchFollowCounts: (userId: string) => Promise<void>;
   resetProfile: () => void;
 }
 
@@ -105,6 +111,76 @@ export const useProfileStore = create<ProfileState>()(
           }
         } catch (error) {
           set({ loading: false });
+          throw error;
+        }
+      },
+
+      followUser: async (userId: string) => {
+        try {
+          await followUser(userId);
+          const { publicProfile } = get();
+          if (publicProfile && publicProfile.id === userId) {
+            set({
+              publicProfile: {
+                ...publicProfile,
+                is_following: true,
+                followers_count: (publicProfile.followers_count || 0) + 1,
+              },
+            });
+          }
+        } catch (error) {
+          console.error("Follow user failed", error);
+          throw error;
+        }
+      },
+
+      unfollowUser: async (userId: string) => {
+        try {
+          await unfollowUser(userId);
+          const { publicProfile } = get();
+          if (publicProfile && publicProfile.id === userId) {
+            set({
+              publicProfile: {
+                ...publicProfile,
+                is_following: false,
+                followers_count: Math.max((publicProfile.followers_count || 0) - 1, 0),
+              },
+            });
+          }
+        } catch (error) {
+          console.error("Unfollow user failed", error);
+          throw error;
+        }
+      },
+
+      fetchFollowCounts: async (userId: string) => {
+        try {
+          const countsData = await getFollowCounts(userId);
+          const { publicProfile, profile } = get();
+          
+          // Update public profile if it matches
+          if (publicProfile && publicProfile.id === userId) {
+            set({
+              publicProfile: {
+                ...publicProfile,
+                followers_count: countsData.data.followers_count,
+                following_count: countsData.data.following_count,
+              },
+            });
+          }
+          
+          // Update own profile if it matches
+          if (profile && profile.id === userId) {
+            set({
+              profile: {
+                ...profile,
+                followers_count: countsData.data.followers_count,
+                following_count: countsData.data.following_count,
+              },
+            });
+          }
+        } catch (error) {
+          console.error("Fetch follow counts failed", error);
           throw error;
         }
       },

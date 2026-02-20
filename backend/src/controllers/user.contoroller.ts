@@ -1,6 +1,6 @@
 import type { Response, Request, NextFunction } from "express";
 import { decodeToken, extractBearerToken } from "../utils/jwt.util.js";
-import { getUsCities, updateUserProfile, userProfile, searchUsersByName, blockUser as blockUserService } from "../services/user.service.js";
+import { getUsCities, updateUserProfile, userProfile, searchUsersByName, blockUser as blockUserService, followUser as followUserService, unfollowUser as unfollowUserService, getFollowerCount, getFollowCountsController } from "../services/user.service.js";
 import { deleteFromS3, uploadToS3 } from "../services/s3.service.js";
 import { AppError } from "../utils/response/appError.js";
 import { sendSuccess } from "../utils/response/appSuccess.js";
@@ -185,6 +185,174 @@ export const blockUser = async (
       status: RESPONSE_CODES.SUCCESS,
       message: `User ${action} successfully`,
       data: blockResult,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const followUser = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { userId: followingId } = req.params;
+    
+    // Validate required fields
+    if (!followingId) {
+      throw new AppError(400, "User ID to follow is required", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    // Extract and verify token
+    const token = extractBearerToken(req.headers.authorization);
+    const { userId: followerId } = decodeToken(token);
+
+    // Ensure the authenticated user is not trying to follow themselves
+    if (followerId === followingId) {
+      throw new AppError(400, "Users cannot follow themselves", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    // Call the service to follow the user
+    const followResult = await followUserService(followerId, followingId);
+
+    sendSuccess(res, {
+      status: RESPONSE_CODES.SUCCESS,
+      message: "User followed successfully",
+      data: followResult,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const unfollowUser = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { userId: followingId } = req.params;
+    
+    // Validate required fields
+    if (!followingId) {
+      throw new AppError(400, "User ID to unfollow is required", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    // Extract and verify token
+    const token = extractBearerToken(req.headers.authorization);
+    const { userId: followerId } = decodeToken(token);
+
+    // Ensure the authenticated user is not trying to unfollow themselves
+    if (followerId === followingId) {
+      throw new AppError(400, "Users cannot unfollow themselves", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    // Call the service to unfollow the user
+    await unfollowUserService(followerId, followingId);
+
+    sendSuccess(res, {
+      status: RESPONSE_CODES.SUCCESS,
+      message: "User unfollowed successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getFollowerCountController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { userId } = req.params;
+    
+    // Validate required fields
+    if (!userId) {
+      throw new AppError(400, "User ID is required", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    // Get follower count
+    const count = await getFollowerCount(userId);
+
+    sendSuccess(res, {
+      status: RESPONSE_CODES.SUCCESS,
+      message: "Follower count retrieved successfully",
+      data: { followers_count: count },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getFollowingCountController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { userId } = req.params;
+    
+    // Validate required fields
+    if (!userId) {
+      throw new AppError(400, "User ID is required", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    // Get following count
+    const count = await getFollowerCountController(userId, res, next);
+
+    sendSuccess(res, {
+      status: RESPONSE_CODES.SUCCESS,
+      message: "Following count retrieved successfully",
+      data: { following_count: count },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getFollowCounts = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { userId } = req.params;
+    console.log("userId", userId);
+    // Validate required fields
+    if (!userId) {
+      throw new AppError(400, "User ID is required", {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    // Get both counts
+    const counts = await getFollowCountsController(userId);
+
+    sendSuccess(res, {
+      status: RESPONSE_CODES.SUCCESS,
+      message: "Follow counts retrieved successfully",
+      data: counts,
     });
   } catch (error) {
     next(error);

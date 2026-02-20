@@ -261,3 +261,231 @@ export const blockUser = async (
     throw error;
   }
 };
+
+/**
+ * Follow a user by calling the stored procedure
+ * @param followerId - UUID of the user who wants to follow
+ * @param followingId - UUID of the user to be followed
+ * @returns Follow relationship data
+ * @throws Error if validation fails or database error occurs
+ */
+export const followUser = async (
+  followerId: string,
+  followingId: string,
+): Promise<{ follow_id: string; followed_at: string }> => {
+  // Validate inputs
+  if (!followerId || !followingId) {
+    throw new AppError(400, "Both user IDs are required", {
+      code: RESPONSE_CODES.BAD_REQUEST,
+      success: false,
+    });
+  }
+
+  if (followerId === followingId) {
+    throw new AppError(400, "Users cannot follow themselves", {
+      code: RESPONSE_CODES.BAD_REQUEST,
+      success: false,
+    });
+  }
+
+  try {
+    const result = await pool.query(
+      "SELECT * FROM fn_follow_user($1, $2)",
+      [followerId, followingId],
+    );
+
+    // Check if the operation was successful
+    if (!result.rows[0]?.success) {
+      const message = result.rows[0]?.message || "Follow operation failed";
+
+      // Handle specific error cases
+      if (message.includes("already following")) {
+        throw new AppError(409, message, {
+          code: RESPONSE_CODES.USER_ALREADY_EXISTS,
+          success: false,
+        });
+      }
+
+      if (message.includes("not found") || message.includes("required")) {
+        throw new AppError(400, message, {
+          code: RESPONSE_CODES.BAD_REQUEST,
+          success: false,
+        });
+      }
+
+      // General operation failure
+      throw new AppError(400, message, {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    return {
+      follow_id: result.rows[0]?.follow_id || "",
+      followed_at: result.rows[0]?.followed_at || new Date().toISOString(),
+    };
+  } catch (error: any) {
+    // If it's already an AppError, re-throw it
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    // Handle database connection errors
+    if (error.code === "ECONNREFUSED" || error.code === "3D000") {
+      throw new AppError(503, "Database service unavailable", {
+        code: RESPONSE_CODES.INTERNAL_SERVER_ERROR,
+        success: false,
+      });
+    }
+
+    // Re-throw the error for the controller to handle
+    throw error;
+  }
+};
+
+/**
+ * Unfollow a user by calling the stored procedure
+ * @param followerId - UUID of the user who wants to unfollow
+ * @param followingId - UUID of the user to be unfollowed
+ * @throws Error if validation fails or database error occurs
+ */
+export const unfollowUser = async (
+  followerId: string,
+  followingId: string,
+): Promise<void> => {
+  // Validate inputs
+  if (!followerId || !followingId) {
+    throw new AppError(400, "Both user IDs are required", {
+      code: RESPONSE_CODES.BAD_REQUEST,
+      success: false,
+    });
+  }
+
+  if (followerId === followingId) {
+    throw new AppError(400, "Users cannot unfollow themselves", {
+      code: RESPONSE_CODES.BAD_REQUEST,
+      success: false,
+    });
+  }
+
+  try {
+    const result = await pool.query(
+      "SELECT * FROM fn_unfollow_user($1, $2)",
+      [followerId, followingId],
+    );
+
+    // Check if the operation was successful
+    if (!result.rows[0]?.success) {
+      const message = result.rows[0]?.message || "Unfollow operation failed";
+
+      // Handle specific error cases
+      if (message.includes("not following")) {
+        throw new AppError(404, message, {
+          code: RESPONSE_CODES.USER_NOT_FOUND,
+          success: false,
+        });
+      }
+
+      if (message.includes("required") || message.includes("cannot")) {
+        throw new AppError(400, message, {
+          code: RESPONSE_CODES.BAD_REQUEST,
+          success: false,
+        });
+      }
+
+      // General operation failure
+      throw new AppError(400, message, {
+        code: RESPONSE_CODES.BAD_REQUEST,
+        success: false,
+      });
+    }
+
+    // Success, no return value needed
+  } catch (error: any) {
+    // If it's already an AppError, re-throw it
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    // Handle database connection errors
+    if (error.code === "ECONNREFUSED" || error.code === "3D000") {
+      throw new AppError(503, "Database service unavailable", {
+        code: RESPONSE_CODES.INTERNAL_SERVER_ERROR,
+        success: false,
+      });
+    }
+
+    // Re-throw the error for the controller to handle
+    throw error;
+  }
+};
+
+/**
+ * Get follower count for a user
+ * @param userId - UUID of the user
+ * @returns Number of followers
+ */
+export const getFollowerCount = async (userId: string): Promise<number> => {
+  try {
+    const result = await pool.query(
+      "SELECT COUNT(*)::integer as count FROM public.follower WHERE followed_id = $1",
+      [userId]
+    );
+    return result.rows[0]?.count || 0;
+  } catch (error: any) {
+    logger.error("Error getting follower count", { userId, error });
+    throw new AppError(500, "Failed to get follower count", {
+      code: RESPONSE_CODES.INTERNAL_SERVER_ERROR,
+      success: false,
+    });
+  }
+};
+
+/**
+ * Get following count for a user
+ * @param userId - UUID of the user
+ * @returns Number of following
+ */
+export const getFollowingCountController = async (userId: string): Promise<number> => {
+  try {
+    const result = await pool.query(
+      "SELECT COUNT(*)::integer as count FROM public.follower WHERE follower_id = $1",
+      [userId]
+    );
+    return result.rows[0]?.count || 0;
+  } catch (error: any) {
+    logger.error("Error getting following count", { userId, error });
+    throw new AppError(500, "Failed to get following count", {
+      code: RESPONSE_CODES.INTERNAL_SERVER_ERROR,
+      success: false,
+    });
+  }
+};
+
+/**
+ * Get both follower and following counts for a user
+ * @param userId - UUID of the user
+ * @returns Object with followers_count and following_count
+ */
+export const getFollowCountsController = async (userId: string): Promise<{
+  followers_count: number;
+  following_count: number;
+}> => {
+  try {
+    const [followerResult, followingResult] = await Promise.all([
+      pool.query("SELECT COUNT(*)::integer as count FROM public.follower WHERE followed_id = $1", [userId]),
+      pool.query("SELECT COUNT(*)::integer as count FROM public.follower WHERE follower_id = $1", [userId])
+    ]);
+
+    return {
+      followers_count: followerResult.rows[0]?.count || 0,
+      following_count: followingResult.rows[0]?.count || 0,
+    };
+  } catch (error: any) {
+    logger.error("Error getting follow counts", { userId, error });
+    throw new AppError(500, "Failed to get follow counts", {
+      code: RESPONSE_CODES.INTERNAL_SERVER_ERROR,
+      success: false,
+    });
+  }
+};

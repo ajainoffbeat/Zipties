@@ -40,12 +40,6 @@ function FeedPost({ post }) {
     }
   };
 
-  const handleBlockPost = async () => {
-    if (window.confirm("Are you sure you want to block this post? It will be hidden from your feed.")) {
-      await blockPostAction(post.postId);
-    }
-  };
-
   const handleBlockUser = async () => {
     if (window.confirm(`Are you sure you want to block ${post.user.firstName}? You will no longer see their posts.`)) {
       try {
