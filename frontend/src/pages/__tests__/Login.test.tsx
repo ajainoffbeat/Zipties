@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@/test/test-utils';
 import userEvent from '@testing-library/user-event';
-import Auth from '../Auth';
+import Auth from '../Auth/Auth';
 import { expect, it, describe, vi } from 'vitest';
 
 // Mock useNavigate

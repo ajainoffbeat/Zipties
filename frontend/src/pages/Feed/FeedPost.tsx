@@ -1,5 +1,5 @@
 import { memo, useMemo, useCallback, useState } from "react";
-import { Heart, Loader2, MessageCircle, MoreHorizontal, Pencil, Share2, Trash2 } from "lucide-react";
+import { Flag, Heart, MessageCircle, MoreHorizontal, Pencil, Trash2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/utils";
 import { usePostStore } from "@/store/usePostStore";
@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { useProfileStore } from "@/store/useProfileStore";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { InlineComments } from "@/components/comments/InlineComments";
+import { formatPostDate } from "@/lib/utils/formatTime";
 
 function FeedPost({ post }) {
   const navigate = useNavigate();
@@ -26,23 +27,16 @@ function FeedPost({ post }) {
     [post.assets]
   );
 
-  const handleLike = useCallback(
-    () => toggleLike(post.postId),
-    [toggleLike, post.postId]
-  );
-
   const handleCommentClick = useCallback(() => {
     setShowComments(true);
   }, []);
 
   const deleteFlow = useDeletePost();
   const { profile } = useProfileStore();
-  console.log(profile)
   const initials = (post.user.firstName?.[0] ?? "") + (post.user.lastName?.[0] ?? "");
-
+  const isOwner = post.user.userId === profile?.id;
   return (
     <article
-      key={post.postId}
       className="bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
     >
       {/* Header */}
@@ -57,20 +51,15 @@ function FeedPost({ post }) {
 
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-foreground">{post.user.username}</span>
+              <span className="font-semibold text-foreground">{post.user.firstName + " " + post.user.lastName}</span>
               <span className="text-muted-foreground text-sm">@{post.user.username}</span>
             </div>
             <span className="text-xs text-muted-foreground">
-              {new Date(post.createdAt).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
+              {formatPostDate(post.createdAt)}
             </span>
           </div>
         </div>
-        {post.user.userId === profile?.id ? (
+        {isOwner ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="text-muted-foreground shrink-0 -mt-1 -mr-1">
@@ -97,7 +86,31 @@ function FeedPost({ post }) {
           </DropdownMenu>
         ) : (
           <Button variant="ghost" size="icon" className="text-muted-foreground shrink-0 -mt-1 -mr-1">
-            <MoreHorizontal className="w-5 h-5" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="text-muted-foreground shrink-0 -mt-1 -mr-1">
+                <MoreHorizontal className="w-5 h-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem
+                className="gap-2 cursor-pointer"
+                onClick={() => navigate(`/edit-post/${post.postId}`)}
+              >
+                <Flag className="w-4 h-4" />
+                Report Post
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+                onClick={() => deleteFlow.setPostId(post.postId)}
+              >
+                <User className="w-4 h-4" />
+                Block User
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+            
+          </DropdownMenu>
           </Button>
         )}
       </div>

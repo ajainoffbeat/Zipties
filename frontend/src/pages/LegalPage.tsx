@@ -25,7 +25,6 @@ export default function LegalPage({
         <div className="flex-1 flex flex-col justify-center px-8 md:px-16 lg:px-24">
           <div className="max-w-2xl w-full mx-auto">
             <Navbar />
-
             <h1 className="text-3xl font-bold mb-4 mt-20">{title}</h1>
             <p className="text-muted-foreground mb-8">
               Last updated: {lastUpdated}

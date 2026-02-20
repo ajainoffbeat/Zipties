@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 // import Landing from "./pages/Landing";
-import Auth from "./pages/Auth";
+import Auth from "./pages/Auth/Auth";
 import Feed from "./pages/Feed/FeedPage";
 // import Messages from "./pages/Messages";
 // import Proposals from "./pages/Proposals";
@@ -15,13 +15,13 @@ import EditPost from "./pages/EditPost/EditPostPage";
 import NotFound from "./pages/NotFound";
 import ForgotPassword from "./pages/ForgotPassword";
 import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import TermsOfService from "./pages/TermsOfService";
+import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
+import TermsOfService from "./pages/legal/TermsOfService";
 import ResetPassword from "./pages/ResetPassword";
 import Messages from "./pages/Messages";
 import { useAuthStore } from "./store/authStore";
 import { useEffect } from "react";
-import AboutUs from "./pages/AboutUs";
+import AboutUs from "@/pages/legal/AboutUs";
 
 const queryClient = new QueryClient();
 
@@ -52,7 +52,7 @@ const App = () => {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-              <Route path="/about-us" element={<AboutUs />} />
+            <Route path="/about-us" element={<AboutUs />} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/feed" element={<Feed />} />
