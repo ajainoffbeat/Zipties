@@ -2,7 +2,7 @@ import type { Response, Request, NextFunction } from "express";
 import { comparePassword, hashPassword } from "../utils/hashPassword.js";
 import { decodeToken, generateToken, extractBearerToken } from "../utils/jwt.util.js";
 import { createUser, getUserByEmail, logUserLogin, logUserLogout, resetUserPasswordByToken, updateUserPasswordResetToken, verifyPasswordResetToken } from "../services/auth.service.js";
-import { AppError } from "../utils/response/appError.js";   
+import { AppError } from "../utils/response/appError.js";
 import { sendSuccess } from "../utils/response/appSuccess.js";
 import { RESPONSE_CODES } from "../constants/responseCode.constant.js";
 import { RESPONSE_MESSAGES } from "../constants/responseMessages.constant.js";
@@ -34,8 +34,8 @@ export const login = async (
         success: false,
       });
     }
-    
-     const loginLogId = await logUserLogin(user.user_id);
+
+    const loginLogId = await logUserLogin(user.user_id);
 
     if (!loginLogId) {
       throw new AppError(500, "Login log failed", {
@@ -47,6 +47,7 @@ export const login = async (
     const token = generateToken({
       userId: user.user_id,
       email: user.u_email,
+      sessionId: loginLogId,
     });
     res.cookie("token", token, {
       path: "/ ",
@@ -91,10 +92,12 @@ export const signup = async (
     };
 
     const result = await createUser(newUser);
+    const signUpLogId = await logUserLogin(result!.user_id);
     if (result) {
       const token = generateToken({
         userId: result.user_id,
         email: email,
+        sessionId:signUpLogId!
       });
 
       // res.cookie("token", token, {
@@ -148,27 +151,16 @@ export const logout = async (
 
     const decoded = decodeToken(token);
 
-    if (!decoded || !decoded.userId) {
+    if (!decoded || !decoded.userId || !decoded.sessionId) {
       throw new AppError(401, RESPONSE_MESSAGES[RESPONSE_CODES.UNAUTHORIZED], {
         code: RESPONSE_CODES.UNAUTHORIZED,
         success: false,
       });
     }
 
-    const userId = decoded.userId as string;
+    const sessionId = decoded.sessionId as string;
 
-    const isLoggedOut = await logUserLogout(userId);
-
-    if (!isLoggedOut) {
-      throw new AppError(
-        500,
-        RESPONSE_MESSAGES[RESPONSE_CODES.INTERNAL_SERVER_ERROR],
-        {
-          code: RESPONSE_CODES.INTERNAL_SERVER_ERROR,
-          success: false,
-        },
-      );
-    }
+    await logUserLogout(sessionId);
 
     // Clear cookie if used by frontend
     res.clearCookie("token", {

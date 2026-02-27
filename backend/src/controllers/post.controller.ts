@@ -357,6 +357,7 @@ export const getPostsController = async (
   try {
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
+    const city = req.query.city as string;
     const token = extractBearerToken(req.headers.authorization);
 
     const decoded = decodeToken(token);
@@ -384,7 +385,7 @@ export const getPostsController = async (
       });
     }
 
-    const postsResponse = await getPosts(userId, limit, offset);
+    const postsResponse = await getPosts(userId, limit, offset, city);
 
     return sendSuccess(res, {
       status: 200,
@@ -590,13 +591,6 @@ export const togglePostLikeController = async (
   next: NextFunction,
 ) => {
   try {
-    console.log("like controller hit");
-    console.log("user params",req.params);
-    console.log("authorisation header",req.headers.authorization);
-    
-    
-    
-    
     const token = extractBearerToken(req.headers.authorization);
 
     const decoded = decodeToken(token);

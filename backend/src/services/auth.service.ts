@@ -94,7 +94,7 @@ export const logUserLogin = async (userId: string): Promise<string | null> => {
     logger.debug('Logging user login attempt', { userId });
 
     const result = await pool.query(
-      "SELECT log_for_user_login ($1) AS log_id",
+      "SELECT fn_log_for_user_login ($1) AS log_id",
       [userId]
     );
 
@@ -115,26 +115,17 @@ export const logUserLogin = async (userId: string): Promise<string | null> => {
   }
 };
 
-export const logUserLogout = async (userId: string): Promise<boolean> => {
+export const logUserLogout = async (sessionId: string): Promise<void> => {
   try {
-    logger.debug('Logging user logout attempt', { userId });
+    logger.debug('Logging user logout attempt', { sessionId });
 
     const result = await pool.query(
       "SELECT fn_log_for_user_logout($1) AS success",
-      [userId]
+      [sessionId]
     );
-
-    const success = result.rows[0]?.success === true;
-    if (success) {
-      logger.info('User logout logged successfully', { userId });
-    } else {
-      logger.warn('Failed to log user logout', { userId });
-    }
-
-    return success;
   } catch (error) {
     logger.error('Failed to log user logout', {
-      userId,
+      sessionId,
       error: error instanceof Error ? error.message : 'Unknown error'
     });
     throw error;

@@ -10,13 +10,14 @@ const JWT_EXPIRES_IN: SignOptions["expiresIn"] = env.JWT_EXPIRES_IN as SignOptio
 interface JwtPayload {
   userId: string;
   email: string;
+  sessionId: string;
   [key: string]: any; // optional extra fields
 }
- 
+
 export const generateToken = (payload: JwtPayload): string => {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 };
- 
+
 export const verifyToken = (token: string): JwtPayload | null => {
   try {
     return jwt.verify(token, JWT_SECRET) as JwtPayload;
@@ -25,12 +26,12 @@ export const verifyToken = (token: string): JwtPayload | null => {
     return null;
   }
 };
- 
+
 export const decodeToken = (token: string): AuthPayload => {
   try {
     const decoded = jwt.decode(token) as AuthPayload | null;
 
-    if (!decoded || !decoded.userId) {
+    if (!decoded || !decoded.userId || !decoded.sessionId) {
       throw new AppError(401, "Invalid token payload");
     }
 

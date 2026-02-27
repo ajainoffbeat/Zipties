@@ -25,4 +25,5 @@ export interface LoginSuccessResponse {
 
 export interface AuthPayload extends JwtPayload {
   userId: string;
+  sessionId: string;
 }

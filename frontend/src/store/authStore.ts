@@ -6,6 +6,7 @@ import { useProfileStore } from "./useProfileStore";
 import { useInboxStore } from "./useInboxStore";
 import { useMessageStore } from "./useMessageStore";
 import { connectSocket, disconnectSocket } from "../lib/utils/socket";
+import { logout } from "@/lib/api/auth.api"
 
 type JwtPayload = {
   userId: string;
@@ -41,7 +42,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     });
   },
 
-  logout: () => {
+  logout: async () => {
+    await logout();
     Cookies.remove("token");
     disconnectSocket();
     useProfileStore.getState().resetProfile();

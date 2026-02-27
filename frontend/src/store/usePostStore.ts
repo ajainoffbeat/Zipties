@@ -48,8 +48,10 @@ interface PostState {
     isSearching: boolean;
     searchResults: Post[];
     searchPagination: Pagination;
+    selectedCity: string;
 
     fetchPosts: (reset?: boolean) => Promise<void>;
+    setSelectedCity: (city: string) => void;
     searchPosts: (query: string, reset?: boolean) => Promise<void>;
     clearSearch: () => void;
     getPost: (postId: string) => Promise<Post>;
@@ -74,8 +76,14 @@ export const usePostStore = create<PostState>((set, get) => ({
     isSearching: false,
     searchResults: [],
     searchPagination: { limit: 20, offset: 0, hasMore: true },
+    selectedCity: "",
 
     clearError: () => set({ error: null }),
+
+    setSelectedCity: (city: string) => {
+        set({ selectedCity: city });
+        get().fetchPosts(true);
+    },
 
     toggleLike: async (postId) => {
         const currentPost = get().posts.find(p => p.postId === postId);
@@ -94,29 +102,29 @@ export const usePostStore = create<PostState>((set, get) => ({
             }),
         }));
 
-        
 
 
-            try {
-                const response = await togglePostLikeApi(postId);
 
-                set((state) => ({
-                    posts: state.posts.map((p) => {
-                        if (p.postId !== postId) return p;
+        try {
+            const response = await togglePostLikeApi(postId);
 
-                        const isLiked = response.isLiked;
+            set((state) => ({
+                posts: state.posts.map((p) => {
+                    if (p.postId !== postId) return p;
 
-                        return {
-                            ...p,
-                            isLiked,
-                            likes: isLiked
-                                ? p.likes + (p.isLiked ? 0 : 1)
-                                : p.likes - (p.isLiked ? 1 : 0),
-                        };
-                    }),
-                }));
-            
- } catch (err: any) {
+                    const isLiked = response.isLiked;
+
+                    return {
+                        ...p,
+                        isLiked,
+                        likes: isLiked
+                            ? p.likes + (p.isLiked ? 0 : 1)
+                            : p.likes - (p.isLiked ? 1 : 0),
+                    };
+                }),
+            }));
+
+        } catch (err: any) {
             // Revert optimistic update on error
             set((state) => ({
                 posts: state.posts.map((p) =>
@@ -154,7 +162,7 @@ export const usePostStore = create<PostState>((set, get) => ({
     },
 
     fetchPosts: async (reset = false) => {
-        const { pagination, isLoading } = get();
+        const { pagination, isLoading, selectedCity } = get();
         if (isLoading) return;
         if (!reset && !pagination.hasMore) return;
 
@@ -162,7 +170,7 @@ export const usePostStore = create<PostState>((set, get) => ({
         set({ isLoading: true, error: null });
 
         try {
-            const data = await getPostsApi(pagination.limit, offset);
+            const data = await getPostsApi(pagination.limit, offset, selectedCity || undefined);
             // data shape: { success, message, posts, pagination, code }
             const incoming: Post[] = (data.posts ?? []).map((p: any) => ({
                 ...p,

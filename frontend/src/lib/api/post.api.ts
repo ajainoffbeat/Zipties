@@ -12,8 +12,8 @@ export const createPost = async (content: string, imageFiles: File[]) => {
 };
 
 /** Fetch paginated posts for the feed */
-export const getPosts = async (limit = 20, offset = 0) => {
-    const res = await api.get("/posts", { params: { limit, offset } });
+export const getPosts = async (limit = 20, offset = 0, city?: string) => {
+    const res = await api.get("/posts", { params: { limit, offset, city } });
     return res.data;
 };
 

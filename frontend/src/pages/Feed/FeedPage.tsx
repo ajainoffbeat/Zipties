@@ -2,6 +2,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import CreatePostCard from "@/pages/Feed/CreatePostCard";
 import FeedList from "@/pages/Feed/FeedList";
 import { PostSearch } from "@/components/search/PostSearch";
+import { CityFilter } from "@/pages/Feed/CityFilter";
 
 export default function FeedPage() {
   return (
@@ -9,9 +10,13 @@ export default function FeedPage() {
       <div className="container mx-auto px-4 py-8 mb-[18rem]">
         <div className="grid lg:grid-cols-12 gap-8 max-w-6xl mx-auto">
           <div className="lg:col-span-8 space-y-6">
-            {/* Search Bar */}
             <CreatePostCard />
-              <PostSearch />
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <PostSearch />
+              </div>
+              <CityFilter />
+            </div>
             <FeedList />
           </div>
         </div>

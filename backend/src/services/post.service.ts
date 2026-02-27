@@ -266,13 +266,13 @@ export const getPost = async (postId: string, userId: string): Promise<PostRespo
   }
 };
 
-export const getPosts = async (userId: string, limit: number = 20, offset: number = 0): Promise<PostsResponse> => {
+export const getPosts = async (userId: string, limit: number = 20, offset: number = 0, city?: string): Promise<PostsResponse> => {
   try {
-    logger.debug('Getting posts', { limit, offset });
+    logger.debug('Getting posts', { limit, offset, city });
 
     const result = await pool.query(
-      "SELECT * FROM fn_get_posts($1, $2, $3)",
-      [userId, limit, offset]
+      "SELECT * FROM fn_get_posts($1, $2, $3, $4)",
+      [userId, limit, offset, city || null]
     );
 
     const postsData = result.rows;

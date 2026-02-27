@@ -7,9 +7,12 @@ const tokenFromCookie = Cookies.get("token");
 export const socket = io(SOCKET_URL, {
   autoConnect: !!tokenFromCookie,
   reconnection: true,
+  transports: ["websocket"],   
+  withCredentials: true,
+
   auth: {
     token: tokenFromCookie
-  },
+  }
 });
 
 export const connectSocket = (token: string) => {
