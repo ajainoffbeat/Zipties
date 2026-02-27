@@ -14,10 +14,11 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { InlineComments } from "@/components/comments/InlineComments";
 import { formatPostDate } from "@/lib/utils/formatTime";
 import { ReportPostDialog } from "@/components/feed/ReportPostDialog";
-import {  toast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { blockUser } from "@/lib/api/user.api";
 
 function FeedPost({ post }) {
+ 
   const navigate = useNavigate();
   const toggleLike = usePostStore((s) => s.toggleLike);
   const blockPostAction = usePostStore((s) => s.blockPost);
@@ -25,6 +26,7 @@ function FeedPost({ post }) {
   const [showComments, setShowComments] = useState(false);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [isReporting, setIsReporting] = useState(false);
+
 
   const handleReport = async (reason: string) => {
     setIsReporting(true);
@@ -86,7 +88,9 @@ function FeedPost({ post }) {
       <div className="flex items-start justify-between p-5 pb-3">
         <div className="flex gap-3">
           <Avatar className="w-11 h-11 shrink-0">
-            <AvatarImage src={`${profile.profile_image_url}`} />
+            {post.user.profile_image_url ? (
+              <AvatarImage src={post.user.profile_image_url} />
+            ) : null}
             <AvatarFallback className="bg-primary/10 text-primary font-medium">
               {initials.toUpperCase() || "U"}
             </AvatarFallback>
@@ -168,8 +172,8 @@ function FeedPost({ post }) {
           size="sm"
           onClick={() => toggleLike(post.postId)}
           className={cn(
-            "text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors",
-            post.isLiked && "text-rose-500"
+            "text-muted-foreground hover:text-primary hover:bg-rose-500/10 transition-colors",
+            post.isLiked && "text-primary"
           )}
         >
           <Heart className={cn("w-4 h-4 mr-1.5 transition-all", post.isLiked && "fill-current scale-110")} />

@@ -81,29 +81,42 @@ export const usePostStore = create<PostState>((set, get) => ({
         const currentPost = get().posts.find(p => p.postId === postId);
         if (!currentPost) return;
 
-        // Optimistic update
         const originalIsLiked = currentPost.isLiked;
         const originalLikes = currentPost.likes;
 
+        // Optimistic update
         set((state) => ({
-            posts: state.posts.map((p) =>
-                p.postId === postId
-                    ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 }
-                    : p
-            ),
+            posts: state.posts.map((p) => {
+                if (p.postId !== postId) return p;
+                const newIsLiked = !p.isLiked;
+                const newLikes = newIsLiked ? p.likes + 1 : Math.max(0, p.likes - 1);
+                return { ...p, isLiked: newIsLiked, likes: newLikes };
+            }),
         }));
 
-        try {
-            const response = await togglePostLikeApi(postId);
-            // Use the actual isLiked from backend response
-            set((state) => ({
-                posts: state.posts.map((p) =>
-                    p.postId === postId
-                        ? { ...p, isLiked: response.isLiked, likes: response.isLiked ? originalLikes + 1 : originalLikes - 1 }
-                        : p
-                ),
-            }));
-        } catch (err: any) {
+        
+
+
+            try {
+                const response = await togglePostLikeApi(postId);
+
+                set((state) => ({
+                    posts: state.posts.map((p) => {
+                        if (p.postId !== postId) return p;
+
+                        const isLiked = response.isLiked;
+
+                        return {
+                            ...p,
+                            isLiked,
+                            likes: isLiked
+                                ? p.likes + (p.isLiked ? 0 : 1)
+                                : p.likes - (p.isLiked ? 1 : 0),
+                        };
+                    }),
+                }));
+            
+ } catch (err: any) {
             // Revert optimistic update on error
             set((state) => ({
                 posts: state.posts.map((p) =>
@@ -160,8 +173,12 @@ export const usePostStore = create<PostState>((set, get) => ({
             }));
 
             set((state) => ({
-                posts: reset ? incoming : [...state.posts, ...incoming],
-                pagination: data.pagination ?? state.pagination,
+                posts: reset ? incoming : [...state.posts, ...incoming.filter(p => !state.posts.some(x => x.postId === p.postId))],
+                pagination: {
+                    ...state.pagination,
+                    offset: reset ? incoming.length : state.pagination.offset + incoming.length,
+                    hasMore: incoming.length === state.pagination.limit, // keep based on backend page size
+                },
                 isLoading: false,
             }));
         } catch (err: any) {

@@ -171,7 +171,7 @@ export function InlineComments({
                 size="sm"
                 onClick={() => loadComments()}
                 disabled={isLoading}
-                className="text-muted-foreground hover:text-foreground text-xs font-medium"
+                className="text-muted-foreground hover:text-foreground  text-xs font-medium hover:text-white "    // TODO: Change hover:text-black to hover:text-white
               >
                 {isLoading ? (
                   <>

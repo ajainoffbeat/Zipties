@@ -28,10 +28,10 @@ async function testDB() {
       functions: functions.rows.map(r => r.proname)
     }));
     
-  } catch (error) {
+  } catch (err) {
     console.log(JSON.stringify({
       success: false,
-      error: error.message
+      error: err instanceof Error ? err.message : String(err)
     }));
   } finally {
     await pool.end();

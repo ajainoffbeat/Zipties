@@ -45,7 +45,15 @@ export default function CreatePostCard() {
             <textarea
               placeholder="What's on your mind?"
               value={composer.text}
-              onChange={(e) => { composer.setText(e.target.value) }}
+              onChange={(e) => {
+                const value = e .target.value;
+                if(value.length <= 200){
+                 composer.setText(value)
+                }else {
+                  composer.setText(value.slice(0,200))
+                }
+              }}
+              
               className="w-full bg-transparent border-none resize-none focus:outline-none text-foreground placeholder:text-muted-foreground min-h-[60px] text-[15px] leading-relaxed"
             />
 

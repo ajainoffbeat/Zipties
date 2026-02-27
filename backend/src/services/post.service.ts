@@ -301,7 +301,8 @@ export const getPosts = async (userId: string, limit: number = 20, offset: numbe
         userId: post.user_id,
         firstName: post.user_firstname || '',
         lastName: post.user_lastname || '',
-        username: post.user_username || ''
+        username: post.user_username || '',
+        profile_image_url: post.user_profile_image_url || '',
       },
       assets: post.assets || []
     }));

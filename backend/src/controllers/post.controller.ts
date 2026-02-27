@@ -590,6 +590,13 @@ export const togglePostLikeController = async (
   next: NextFunction,
 ) => {
   try {
+    console.log("like controller hit");
+    console.log("user params",req.params);
+    console.log("authorisation header",req.headers.authorization);
+    
+    
+    
+    
     const token = extractBearerToken(req.headers.authorization);
 
     const decoded = decodeToken(token);
