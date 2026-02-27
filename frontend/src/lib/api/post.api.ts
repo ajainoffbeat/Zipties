@@ -35,7 +35,7 @@ export const editPost = async (postId: string, content: string, imageFiles: File
     formData.append("content", content);
     imageFiles.forEach((file) => formData.append("images", file));
     removedImageIds.forEach((id) => formData.append("deleteFilesIds[]", id));
-    
+
     const res = await api.put(`/posts/edit/${postId}`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
     });
@@ -63,5 +63,23 @@ export const createPostComment = async (postId: string, comment: string) => {
 /** Search posts by content */
 export const searchPosts = async (searchQuery: string, limit = 20, offset = 0) => {
     const res = await api.get("/posts/search", { params: { q: searchQuery, limit, offset } });
+    return res.data;
+};
+// ... existing code ...
+/** Block a post */
+export const blockPost = async (postId: string) => {
+    const res = await api.post(`/posts/block/${postId}`);
+    return res.data;
+};
+
+/** Report a post */
+export const reportPost = async (postId: string, comment: string) => {
+    const res = await api.post(`/posts/report/${postId}`, { comment });
+    return res.data;
+};
+
+/** Report a comment */
+export const reportComment = async (commentId: string, reason: string) => {
+    const res = await api.post(`/posts/comment/report/${commentId}`, { reason });
     return res.data;
 };

@@ -109,7 +109,7 @@ export function Navbar() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-1">
-            {navItems.map((item) => {
+            { navItems.map((item) => {
               const isActive = location.pathname === item.path;
               const isMessages = item.label === "Messages";
               return (

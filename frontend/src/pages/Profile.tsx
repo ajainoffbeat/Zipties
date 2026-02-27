@@ -7,6 +7,7 @@ import {
   MapPin,
   Calendar,
   MessageCircle,
+  UserPlus,
 
 } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
@@ -20,21 +21,11 @@ import { useToast } from "@/components/ui/use-toast";
 import { ProfileSkeleton } from "@/components/skeletons/ProfileSkeleton";
 
 import { Ban } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 export default function Profile() {
   const { userId } = useParams();
-  const { profile, publicProfile, fetchProfileById, loading } = useProfileStore();
+  const { profile, publicProfile, fetchProfileById, fetchMyProfile, loading, followUser, unfollowUser } = useProfileStore();
   const navigate = useNavigate();
   const loggedInUserId = useAuthStore((s) => s.userId);
   const { toast } = useToast();
@@ -44,8 +35,11 @@ export default function Profile() {
   useEffect(() => {
     if (userId && userId !== loggedInUserId) {
       fetchProfileById(userId);
+    }else{
+      fetchMyProfile(loggedInUserId);
     }
-  }, [userId, loggedInUserId, fetchProfileById]);
+  }, [userId, loggedInUserId, fetchProfileById, fetchMyProfile]);
+
 
   const displayProfile = userId && userId !== loggedInUserId ? publicProfile : profile;
   const isOwnProfile = !userId || (userId === loggedInUserId);
@@ -103,6 +97,40 @@ export default function Profile() {
     }
   };
 
+  const handleFollow = async () => {
+    if (!displayProfile?.id) return;
+    try {
+      await followUser(displayProfile.id);
+      toast({
+        title: "Success",
+        description: `You are now following ${displayProfile.first_name}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to follow user.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleUnfollow = async () => {
+    if (!displayProfile?.id) return;
+    try {
+      await unfollowUser(displayProfile.id);
+      toast({
+        title: "Success",
+        description: `You have unfollowed ${displayProfile.first_name}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to unfollow user.",
+        variant: "destructive"
+      });
+    }
+  };
+
 
   return (
     <AppLayout>
@@ -147,6 +175,27 @@ export default function Profile() {
                             <MessageCircle className="w-4 h-4" />
                             Message
                           </Button>
+                          {displayProfile?.is_following ? (
+                            <Button 
+                              variant="secondary" 
+                              size="sm" 
+                              className="gap-1 px-4" 
+                              onClick={handleUnfollow}
+                            >
+                              <UserPlus className="w-4 h-4" />
+                              Unfollow
+                            </Button>
+                          ) : (
+                            <Button 
+                              variant="default" 
+                              size="sm" 
+                              className="gap-1 px-4" 
+                              onClick={handleFollow}
+                            >
+                              <UserPlus className="w-4 h-4" />
+                              Follow
+                            </Button>
+                          )}
                           {displayProfile?.isblocked ? (
                             <Button
                               variant="secondary"
@@ -167,8 +216,7 @@ export default function Profile() {
                               <Ban className="w-4 h-4" />
                               Block
                             </Button>
-                          )
-                          }
+                          )}
                         </>
                       )}
                     </div>
@@ -190,6 +238,12 @@ export default function Profile() {
                   </p>
 
                   <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground mb-6">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <strong className="text-foreground">{displayProfile?.followers_count || 0}</strong> Followers
+                    </span>
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <strong className="text-foreground">{displayProfile?.following_count || 0}</strong> Following
+                    </span>
                     {displayProfile?.city_name && (
                       <span className="flex items-center gap-1.5 font-medium">
                         <MapPin className="w-4 h-4 text-primary" />
@@ -201,13 +255,12 @@ export default function Profile() {
                       Joined{" "}
                       {displayProfile?.joined_date
                         ? new Date(displayProfile.joined_date).toLocaleDateString("en-IN", {
-                          year: "numeric",
-                          month: "long",
-                        })
+                            year: "numeric",
+                            month: "long",
+                          })
                         : ""}
                     </span>
                   </div>
-
                 </div>
               </div>
 

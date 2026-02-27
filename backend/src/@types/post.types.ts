@@ -30,6 +30,18 @@ export interface PostAssetData {
   userId: string;
 }
 
+export interface ReportPostRequest {
+  userId: string;
+  postId: string;
+  comment: string;
+}
+
+export interface ReportCommentRequest {
+  userId: string;
+  commentId: string;
+  reason: string;
+}
+
 export interface PostResponse {
   postId: string;
   content: string;

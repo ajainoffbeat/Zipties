@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { createPost as createPostApi, getPosts as getPostsApi, getPost as getPostApi, deletePost as deletePostApi, editPost as editPostApi, togglePostLike as togglePostLikeApi, getPostComments as getPostCommentsApi, createPostComment as createPostCommentApi, searchPosts as searchPostsApi } from "@/lib/api/post.api";
+import { createPost as createPostApi, getPosts as getPostsApi, getPost as getPostApi, deletePost as deletePostApi, editPost as editPostApi, togglePostLike as togglePostLikeApi, getPostComments as getPostCommentsApi, createPostComment as createPostCommentApi, searchPosts as searchPostsApi, blockPost as blockPostApi, reportPost as reportPostApi } from "@/lib/api/post.api";
 
 /* ── Types mirroring the backend PostResponse ── */
 export interface PostAsset {
@@ -57,6 +57,8 @@ interface PostState {
     editPost: (postId: string, content: string, imageFiles: File[], removedImageIds?: string[]) => Promise<void>;
     deletePost: (postId: string) => Promise<void>;
     toggleLike: (postId: string) => Promise<void>;
+    blockPost: (postId: string) => Promise<void>;
+    reportPost: (postId: string, comment: string) => Promise<void>;
     getPostComments: (postId: string, limit?: number, offset?: number) => Promise<any>;
     createComment: (postId: string, comment: string) => Promise<void>;
     clearError: () => void;
@@ -79,29 +81,42 @@ export const usePostStore = create<PostState>((set, get) => ({
         const currentPost = get().posts.find(p => p.postId === postId);
         if (!currentPost) return;
 
-        // Optimistic update
         const originalIsLiked = currentPost.isLiked;
         const originalLikes = currentPost.likes;
-        
+
+        // Optimistic update
         set((state) => ({
-            posts: state.posts.map((p) =>
-                p.postId === postId
-                    ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 }
-                    : p
-            ),
+            posts: state.posts.map((p) => {
+                if (p.postId !== postId) return p;
+                const newIsLiked = !p.isLiked;
+                const newLikes = newIsLiked ? p.likes + 1 : Math.max(0, p.likes - 1);
+                return { ...p, isLiked: newIsLiked, likes: newLikes };
+            }),
         }));
 
-        try {
-            const response = await togglePostLikeApi(postId);
-            // Use the actual isLiked from backend response
-            set((state) => ({
-                posts: state.posts.map((p) =>
-                    p.postId === postId
-                        ? { ...p, isLiked: response.isLiked, likes: response.isLiked ? originalLikes + 1 : originalLikes - 1 }
-                        : p
-                ),
-            }));
-        } catch (err: any) {
+        
+
+
+            try {
+                const response = await togglePostLikeApi(postId);
+
+                set((state) => ({
+                    posts: state.posts.map((p) => {
+                        if (p.postId !== postId) return p;
+
+                        const isLiked = response.isLiked;
+
+                        return {
+                            ...p,
+                            isLiked,
+                            likes: isLiked
+                                ? p.likes + (p.isLiked ? 0 : 1)
+                                : p.likes - (p.isLiked ? 1 : 0),
+                        };
+                    }),
+                }));
+            
+ } catch (err: any) {
             // Revert optimistic update on error
             set((state) => ({
                 posts: state.posts.map((p) =>
@@ -111,6 +126,30 @@ export const usePostStore = create<PostState>((set, get) => ({
                 ),
                 error: err?.response?.data?.message ?? "Failed to toggle like",
             }));
+        }
+    },
+
+
+    blockPost: async (postId: string) => {
+        try {
+            await blockPostApi(postId);
+            set((state) => ({
+                posts: state.posts.filter((p) => p.postId !== postId),
+            }));
+            // toast.success("Post blocked successfully"); // Toast handled by caller or global handler if needed
+        } catch (error) {
+            console.error("Error blocking post:", error);
+            // toast.error("Failed to block post");
+        }
+    },
+
+    reportPost: async (postId: string, comment: string) => {
+        try {
+            await reportPostApi(postId, comment);
+            // toast.success("Post reported successfully");
+        } catch (error) {
+            console.error("Error reporting post:", error);
+            // toast.error("Failed to report post");
         }
     },
 
@@ -134,8 +173,12 @@ export const usePostStore = create<PostState>((set, get) => ({
             }));
 
             set((state) => ({
-                posts: reset ? incoming : [...state.posts, ...incoming],
-                pagination: data.pagination ?? state.pagination,
+                posts: reset ? incoming : [...state.posts, ...incoming.filter(p => !state.posts.some(x => x.postId === p.postId))],
+                pagination: {
+                    ...state.pagination,
+                    offset: reset ? incoming.length : state.pagination.offset + incoming.length,
+                    hasMore: incoming.length === state.pagination.limit, // keep based on backend page size
+                },
                 isLoading: false,
             }));
         } catch (err: any) {
@@ -218,14 +261,14 @@ export const usePostStore = create<PostState>((set, get) => ({
     editPost: async (postId, content, imageFiles, removedImageIds = []) => {
         try {
             const response = await editPostApi(postId, content, imageFiles, removedImageIds);
-            
+
             // Update post in local state with the response data
             set((state) => ({
                 posts: state.posts.map((p) =>
                     p.postId === postId
-                        ? { 
-                            ...p, 
-                            content, 
+                        ? {
+                            ...p,
+                            content,
                             updatedAt: new Date().toISOString(),
                             // Update assets with the response from API
                             assets: response.assets || p.assets

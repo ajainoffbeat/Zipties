@@ -1,44 +1,36 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Mail,
-  Lock,
-  User,
-  Eye,
-  EyeOff,
-} from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import { authSchema, AuthFormValues } from "@/lib/validators/auth.schema";
 import logo2 from "@/assets/logo.png";
-import { useAuth } from "@/hooks/useAuth";
-import Cookies from "js-cookie";
-import { setCookie } from "@/utils/cookies";
-import { toast } from "@/hooks/use-toast";
-import { Footer } from "./Footer";
-import { useAuthStore } from "@/store/authStore";
-import { useProfileStore } from "@/store/useProfileStore";
+import { Footer } from "../Footer";
+import { useAuthForm } from "@/hooks/useAuthForm";
 
-
-export default function Auth() {
-  const [isLogin, setIsLogin] = useState(true);
+export default function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const { loginMutation, signupMutation } = useAuth();
   const [rememberMe, setRememberMe] = useState(false);
-  // const [acceptPolicy, setAcceptPolicy] = useState(false);
-  // const { toasts } = useToast();
   const navigate = useNavigate();
+
+  const {
+    isLogin,
+    toggleMode,
+    onSubmit,
+    loginPending,
+    signupPending,
+  } = useAuthForm();
 
   const {
     register,
     handleSubmit,
     setValue,
     clearErrors,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<AuthFormValues>({
     resolver: zodResolver(authSchema),
     defaultValues: {
@@ -48,70 +40,7 @@ export default function Auth() {
       fullName: "",
       confirmPassword: "",
     },
-    mode: "onTouched",
   });
-
-  const toggleMode = () => {
-    const nextMode = isLogin ? "signup" : "login";
-    setIsLogin(!isLogin);
-    setValue("mode", nextMode);
-    clearErrors();
-  };
-
-  useEffect(() => {
-    const token = Cookies.get('token');
-    if (token) {
-      navigate("/feed");
-    }
-  }, []);
-
-  const onSubmit = async (data: AuthFormValues) => {
-    try {
-      const { confirmPassword, ...payload } = data;
-      if (payload.mode === "login") {
-        const response = await loginMutation.mutateAsync(payload);
-        if (response.data.success === true) {
-          useAuthStore.getState().setToken(response.data.token);
-          const userId = useAuthStore.getState().userId;
-          if (userId) {
-            await useProfileStore.getState().fetchMyProfile(userId);
-          }
-          navigate("/feed");
-        }
-        else {
-          toast({
-            variant: "default",
-            title: "Login Failed",
-            description: response.data.message,
-          });
-        }
-
-      } else {
-        const response = await signupMutation.mutateAsync(payload);
-        if (response.data.success === true) {
-          useAuthStore.getState().setToken(response.data.token);
-          const userId = useAuthStore.getState().userId;
-          if (userId) {
-            await useProfileStore.getState().fetchMyProfile(userId);
-          }
-          navigate("/feed");
-        }
-        else {
-          toast({
-            variant: "default",
-            title: "SignIn Failed",
-            description: response.data.message,
-          });
-        }
-      }
-    } catch (err: any) {
-      toast({
-        variant: "default",
-        title: "Sign Up Failed",
-        description: err.response?.data.error || "An error occurred",
-      });
-    }
-  };
 
   return (
     <>
@@ -229,40 +158,34 @@ export default function Auth() {
                 </div>
               )
               }
+              {isLogin && (
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="h-4 w-4 ml-1 rounded border-muted-foreground text-primary focus:ring-primary cursor-pointer accent-primary"
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      Remember me
+                    </span>
+                  </label>
 
-              {
-
-                isLogin && (
-                  <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={rememberMe}
-                        onChange={(e) => setRememberMe(e.target.checked)}
-                        className="h-4 w-4 ml-1 rounded border-muted-foreground text-primary focus:ring-primary cursor-pointer accent-primary"
-                      />
-                      <span className="text-sm text-muted-foreground">
-                        Remember me
-                      </span>
-                    </label>
-
-                    {isLogin && (
-                      <button
-                        type="button"
-                        onClick={() => navigate("/forgot-password")}
-                        className="text-sm text-primary hover:underline"
-                      >
-                        Forgot password?
-                      </button>
-                    )}
-                  </div>
-
-                )
+                  {isLogin && (
+                    <button
+                      type="button"
+                      onClick={() => navigate("/forgot-password")}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
+              )
               }
-
               {!isLogin && (
                 <label className="flex justify-center items-center gap-2 text-sm text-muted-foreground ml-1">
-
                   <span>
                     By creating an account, you agree to our {" "}
 
@@ -281,7 +204,7 @@ export default function Auth() {
                 variant="hero"
                 size="lg"
                 className="w-full"
-                disabled={loginMutation.isPending || signupMutation.isPending}
+                disabled={loginPending || signupPending}
               >
                 {isLogin ? "Sign In" : "Create Account"}
               </Button>
@@ -291,7 +214,7 @@ export default function Auth() {
               {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
               <button
                 type="button"
-                onClick={toggleMode}
+                onClick={() => toggleMode(setValue, clearErrors)}
                 className="text-primary text-sm hover:underline "
               >
                 {isLogin ? "Sign up" : "Sign in"}

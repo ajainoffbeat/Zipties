@@ -20,3 +20,28 @@ export const blockUser = async (payload: {
   const res = await api.post("/user/block", payload);
   return res.data;
 };
+
+export const followUser = async (userId: string) => {
+  const res = await api.post(`/user/follow/${userId}`);
+  return res.data;
+};
+
+export const unfollowUser = async (userId: string) => {
+  const res = await api.post(`/user/unfollow/${userId}`);
+  return res.data;
+};
+
+export const getFollowerCount = async (userId: string) => {
+  const res = await api.get(`/user/followers/${userId}`);
+  return res.data;
+};
+
+export const getFollowingCount = async (userId: string) => {
+  const res = await api.get(`/user/following/${userId}`);
+  return res.data;
+};
+
+export const getFollowCounts = async (userId: string) => {
+  const res = await api.get(`/user/follow-counts/${userId}`);
+  return res.data;
+};

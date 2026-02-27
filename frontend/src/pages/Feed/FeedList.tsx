@@ -15,7 +15,7 @@ export default function FeedList() {
 
   useEffect(() => {
     fetchPosts();
-  }, []);
+  }, [fetchPosts]);
 
   if (isLoading && posts.length === 0) {
     return (
@@ -27,10 +27,20 @@ export default function FeedList() {
   }
 
   return (
-    <>
-      {posts.map((post) => (
+    
+    <Virtuoso
+      useWindowScroll
+      data={posts}
+      itemContent={(index, post) => (
         <FeedPost key={post.postId} post={post} />
-      ))}
-    </>
+      )}
+      endReached={() => {
+        if (!isLoading && pagination.hasMore) {
+          fetchPosts();
+        }
+        
+      }}
+    />
+    
   );
 }
