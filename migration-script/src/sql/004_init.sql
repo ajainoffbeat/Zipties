@@ -1,6 +1,6 @@
 -- For post table
 ALTER TABLE public.post
-ALTER COLUMN is_blocked TYPE BOOLEAN USING (is_blocked = B '1');
+ALTER COLUMN is_blocked TYPE BOOLEAN USING (is_blocked = B'1');
 -- Converts the existing 'is_blocked' column from BIT(1) to BOOLEAN.
 -- Any value B'1' becomes TRUE, B'0' becomes FALSE.
 ALTER TABLE public.post
@@ -9,7 +9,7 @@ SET DEFAULT FALSE;
 -- Sets the default value of 'is_blocked' to FALSE for new rows.
 -- For post_assets table
 ALTER TABLE public.post_assets
-ALTER COLUMN is_active TYPE BOOLEAN USING (is_active = B '1');
+ALTER COLUMN is_active TYPE BOOLEAN USING (is_active = B'1');
 -- Converts 'is_active' from BIT(1) to BOOLEAN.
 -- B'1' → TRUE, B'0' → FALSE.
 ALTER TABLE public.post_assets
@@ -26,7 +26,7 @@ VALUES (
         uuid_generate_v4(),
         'image',
         'Image files',
-        b '1'
+        B'1'
     );
 
 INSERT INTO public.post_reaction_type (
@@ -39,7 +39,7 @@ VALUES (
         uuid_generate_v4(),
         'like',
         'Like reaction',
-        b '1'
+        B'1'
     );
 
 ALTER TABLE post_assets

@@ -69,7 +69,7 @@ export interface SendMessageRequest {
 
 export interface MarkReadRequest {
   conversation_id: string;
-  last_message_id: string;
+  last_message_id?: string | null;
 }
 
 export interface GetMessagesQuery {
@@ -102,9 +102,8 @@ export interface InboxItem {
   title: string;
   type_name: string;
   unread_count: number;
+  last_read_message_id: string | null;
   last_message_content: string;
-  last_message_iv: string | null;
-  last_message_auth_tag: string | null;
   last_message_at: string;
   last_message_sender_id: string;
   last_message_sender_name: string;

@@ -123,7 +123,7 @@ export const markConversationRead = async (req: Request, res: Response) => {
     await markConversationReadService(
       conversation_id,
       userId,
-      last_message_id,
+      last_message_id || null,
     );
 
     res.status(200).json({
@@ -171,8 +171,12 @@ export const getConversationMessages = async (req: Request, res: Response) => {
     const conversationId = req.params.id as string;
     const { limit, offset } = req.query as GetMessagesQuery;
 
-    const messages = await getConversationMessagesService(
+    const token = extractBearerToken(req.headers.authorization);
+    const { userId } = decodeToken(token);
+
+    const result = await getConversationMessagesService(
       conversationId,
+      userId,
       limit ? parseInt(limit.toString()) : 50,
       offset ? parseInt(offset.toString()) : 0,
     );
@@ -180,7 +184,7 @@ export const getConversationMessages = async (req: Request, res: Response) => {
     res.status(200).json({
       status: 0,
       message: "Messages retrieved successfully",
-      data: messages,
+      data: result,
     });
   } catch (error: any) {
     logger.error("Error getting messages", { error });

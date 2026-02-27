@@ -91,7 +91,7 @@ export const sendMessage = async (
 export const markConversationRead = async (
   conversationId: string,
   userId: string,
-  lastMessageId: string
+  lastMessageId: string | null
 ): Promise<void> => {
   await pool.query(
     "SELECT fn_mark_conversation_read($1, $2, $3)",
@@ -121,13 +121,31 @@ export const getUserInbox = async (userId: string): Promise<any[]> => {
  */
 export const getConversationMessages = async (
   conversationId: string,
+  userId: string,
   limit: number = 50,
   offset: number = 0
-): Promise<any[]> => {
-  const result = await pool.query(
-    "SELECT * FROM fn_get_conversation_messages($1, $2, $3)",
-    [conversationId, limit, offset]
+): Promise<{ messages: any[]; unread_count: number; last_read_message_id: string | null }> => {
+  const messagesResult = await pool.query(
+    "SELECT * FROM fn_get_conversation_messages($1, $2, $3, $4)",
+    [conversationId, limit, offset, userId]
   );
- 
-  return result.rows;
+
+  const unreadResult = await pool.query(
+    `
+    SELECT unread_count, last_read_message_id
+    FROM conversation_member
+    WHERE conversation_id = $1::uuid
+      AND user_id = $2::uuid
+    LIMIT 1
+    `,
+    [conversationId, userId]
+  );
+
+  const unreadRow = unreadResult.rows[0];
+
+  return {
+    messages: messagesResult.rows,
+    unread_count: unreadRow?.unread_count ?? 0,
+    last_read_message_id: unreadRow?.last_read_message_id ?? null,
+  };
 };

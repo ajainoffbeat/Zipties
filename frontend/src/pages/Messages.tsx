@@ -95,6 +95,42 @@ export default function Messages() {
     loadInbox();
   }, [userId, targetConvoId, refreshId]);
 
+  const markSelectedConversationRead = useCallback(async () => {
+    if (!selectedConvo) return;
+
+    // Backend returns messages DESC; newest is index 0 in API result.
+    // We can safely use the newest message currently rendered (ASC in UI).
+    const newestInUi = messages[messages.length - 1];
+    if (!newestInUi?.id) return;
+
+    try {
+      await getReadMessages(selectedConvo.id, newestInUi.id);
+      updateConversation(selectedConvo.id, { unread: 0 });
+    } catch (e) {
+      // keep silent; unread will be corrected on next inbox refresh
+    }
+  }, [messages, selectedConvo, updateConversation]);
+
+  useEffect(() => {
+    // When user navigates away (Feed tab) and comes back, many routers keep the
+    // page mounted. Using focus/visibility ensures we re-sync read state.
+    const onFocus = () => {
+      markSelectedConversationRead();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        markSelectedConversationRead();
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [markSelectedConversationRead]);
+
 
   // Use useLayoutEffect so scroll happens BEFORE the browser paints — no visible flash at top
   useLayoutEffect(() => {
@@ -166,11 +202,12 @@ export default function Messages() {
     const oldScrollHeight = scrollContainer?.scrollHeight || 0;
 
     try {
-      const apiMessages = await getConversationMessages(
+      const result = await getConversationMessages(
         selectedConvo.id,
         20,
         messages.length
       );
+      const apiMessages = result?.messages ?? [];
 
       if (apiMessages.length < 20) {
         setHasMore(false);
@@ -289,7 +326,13 @@ export default function Messages() {
       setHasMore(true); // Reset for new conversation
 
       try {
-        const apiMessages = await getConversationMessages(target.id, 20, 0);
+        const result = await getConversationMessages(target.id, 20, 0);
+        const apiMessages = result?.messages ?? [];
+        const newestMessageId = apiMessages[0]?.id;
+        if (newestMessageId) {
+          await getReadMessages(target.id, newestMessageId);
+          updateConversation(target.id, { unread: 0 });
+        }
         const normalizedMsgs = await normalizeMessages(apiMessages, userId!);
         setMessages(normalizedMsgs);
 
@@ -322,7 +365,7 @@ export default function Messages() {
 
       return {
         id: msg.id,
-        isread: msg.isread,
+        isread: msg.isread ?? false,
         conversationId: msg.conversation_id,
         sender: isMe ? "me" : "them",
         content: await decryptMessage(msg.content),
@@ -484,9 +527,10 @@ export default function Messages() {
                         setIsMessagesLoading(true);
                         shouldJumpRef.current = true;
                         setHasMore(true);
-                        const apiMessages = await getConversationMessages(convo.id, 20, 0);
-                        const lastMessageId = apiMessages[apiMessages.length - 1]?.id;
-                        if (lastMessageId) await getReadMessages(convo.id, lastMessageId);
+                        const result = await getConversationMessages(convo.id, 20, 0);
+                        const apiMessages = result?.messages ?? [];
+                        const newestMessageId = apiMessages[0]?.id;
+                        if (newestMessageId) await getReadMessages(convo.id, newestMessageId);
                         const normalizedMsgs = await normalizeMessages(apiMessages, userId!);
                         // Set convo + messages together so the chat area renders with content already loaded
                         setSelectedConvo(convo);

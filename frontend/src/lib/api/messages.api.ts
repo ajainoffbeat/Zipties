@@ -37,7 +37,7 @@ export const getConversationMessages = async (
 export const getReadMessages = async (conversationId: string, messageId: string) => {
   const res = await api.post(`/conversation/read`, {
     conversation_id: conversationId,
-    message_id: messageId,
+    last_message_id: messageId,
   });
   return res.data.data;
 };
