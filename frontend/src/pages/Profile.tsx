@@ -22,6 +22,7 @@ import { ProfileSkeleton } from "@/components/skeletons/ProfileSkeleton";
 
 import { Ban } from "lucide-react";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { usePostStore } from "@/store/usePostStore";
 
 export default function Profile() {
   const { userId } = useParams();
@@ -85,6 +86,7 @@ export default function Profile() {
           : `${displayProfile.first_name} has been unblocked.`,
       });
       setBlockDialogOpen(false);
+      usePostStore.getState().fetchPosts(true);
       navigate("/feed"); // Navigate away after blocking
     } catch (error) {
       toast({

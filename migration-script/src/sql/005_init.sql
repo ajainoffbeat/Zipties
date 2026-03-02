@@ -268,113 +268,72 @@ END;
 $$;
 
 
-DROP FUNCTION IF EXISTS public.fn_get_posts(uuid, integer, integer);
 
-CREATE OR REPLACE FUNCTION public.fn_get_posts(
-	p_user_id uuid,
-	p_limit integer DEFAULT 20,
-	p_offset integer DEFAULT 0,
-	p_city_name character varying DEFAULT NULL::character varying)
-    RETURNS TABLE(post_id uuid, content character varying, created_at timestamp without time zone, user_id uuid, user_firstname character varying, user_lastname character varying, user_username character varying, user_profile_image_url text, assets json, like_count integer, comment_count integer, is_liked boolean) 
-    LANGUAGE 'plpgsql'
-    COST 100
-    VOLATILE PARALLEL UNSAFE
-    ROWS 1000
+DROP FUNCTION IF EXISTS public.check_rate_limit(character varying, integer, integer, character varying, text);
 
-AS $BODY$
+-- ============================================================================
+-- Function Name : check_rate_limit
+-- Purpose       : Checks whether a client (identified by IP address) has
+--                 exceeded the allowed number of requests within a defined
+--                 time window. Every request is logged for auditing and
+--                 monitoring purposes.
+-- Author        : OFFBEAT
+-- Created On    : 29/01/2025
+-- ============================================================================
+CREATE OR REPLACE FUNCTION check_rate_limit(
+    -- Client IP address used to track request frequency
+    p_ip_address VARCHAR,
+    
+    -- Maximum allowed requests within the time window
+    p_limit INTEGER,
+    
+    -- Time window (in seconds) for rate limiting
+    p_window_seconds INTEGER,
+    
+    -- API endpoint being accessed (e.g., 'api/login')
+    p_request_url VARCHAR,
+    
+    -- Request payload/body for auditing or debugging
+    p_request_body TEXT,
+
+    -- User ID for auditing purposes
+    p_user_id UUID
+) 
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_request_count INTEGER;
 BEGIN
-RETURN QUERY
-SELECT 
-    p.id AS post_id,
-    p.content,
-    p.created_at,
-    u.id AS user_id,
-    u.firstname,
-    u.lastname,
-    u.username,
-	u.profile_image_url AS user_profile_image_url,
+    -- Count number of requests from the IP for this specific route within the time window
+    SELECT COUNT(*)
+    INTO v_request_count
+    FROM api_rate_limit
+    WHERE user_ip_address = p_ip_address
+      AND request_url = p_request_url          -- <-- check for this route only
+      AND created_at >= NOW() - (p_window_seconds || ' seconds')::INTERVAL;
 
-    -- ✅ Assets aggregated separately
-    COALESCE(pa.assets, '[]'::json) AS assets,
+    -- Log the current request (logged regardless of limit result)
+    INSERT INTO api_rate_limit (
+        request_url,
+        request_data,
+        user_ip_address,
+        created_at,
+            created_by
+    ) VALUES (
+        p_request_url,
+        p_request_body,
+        p_ip_address,
+        NOW(),
+        p_user_id
+    );
 
-    -- ✅ Likes counted separately
-    COALESCE(lc.like_count, 0) AS like_count,
+    -- Deny request if count exceeds or equals limit
+    IF v_request_count >= p_limit THEN
+        RETURN FALSE;
+    END IF;
 
-    -- ✅ Comments counted separately
-    COALESCE(cc.comment_count, 0) AS comment_count,
-
-    -- ✅ Is liked check
-    EXISTS (
-        SELECT 1
-        FROM public.post_reaction pr_inner
-        JOIN public.post_reaction_type prt_inner 
-            ON pr_inner.post_reaction_type_id = prt_inner.id
-        WHERE pr_inner.post_id = p.id
-          AND pr_inner.user_id = p_user_id
-          AND prt_inner.name = 'like'
-          AND pr_inner.is_active = B'1'
-    ) AS is_liked
-
-FROM public.post p
-JOIN public."user" u 
-    ON p.user_id = u.id
-LEFT JOIN public.city c ON u.city_id = c.id
-
--- 🔥 Aggregate assets separately
-LEFT JOIN LATERAL (
-    SELECT json_agg(
-        json_build_object(
-            'id', pa.id,
-            'url', pa.url,
-            'mimetype', pa.mimetype,
-            'file_size_bytes', pa.file_size_bytes,
-            'position', pa.position
-        )
-        ORDER BY pa.position
-    ) AS assets
-    FROM public.post_assets pa
-    WHERE pa.post_id = p.id
-      AND pa.is_active = true
-) pa ON TRUE
-
--- 🔥 Count likes separately
-LEFT JOIN LATERAL (
-    SELECT COUNT(*)::int AS like_count
-    FROM public.post_reaction pr
-    JOIN public.post_reaction_type prt 
-        ON pr.post_reaction_type_id = prt.id
-    WHERE pr.post_id = p.id
-      AND prt.name = 'like'
-      AND pr.is_active = B'1'
-) lc ON TRUE
-
--- 🔥 Count comments separately
-LEFT JOIN LATERAL (
-    SELECT COUNT(*)::int AS comment_count
-    FROM public.post_comment pc
-    WHERE pc.post_id = p.id
-      AND pc.is_blocked = false
-) cc ON TRUE
-
-WHERE p.is_blocked = false
-  AND u.is_blocked = false
-  AND u.is_active = true
-  AND (p_city_name IS NULL OR c.name = p_city_name)
-  
-  -- 🚫 EXCLUDE POSTS FROM USERS BLOCKED BY CURRENT USER
-  AND NOT EXISTS (
-      SELECT 1 FROM public.user_report ur
-      WHERE ur.blocked_user_id = p.user_id AND ur.user_id = p_user_id
-  )
-
-  -- 🚫 EXCLUDE POSTS FROM USERS WHO BLOCKED CURRENT USER
-  AND NOT EXISTS (
-      SELECT 1 FROM public.user_report ur
-      WHERE ur.blocked_user_id = p_user_id AND ur.user_id = p.user_id
-  )
-
-ORDER BY p.created_at DESC
-LIMIT p_limit OFFSET p_offset;
-
+    -- Request is within allowed rate limit
+    RETURN TRUE;
 END;
-$BODY$;
+$$;

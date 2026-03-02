@@ -6,7 +6,7 @@ type LogErrorInput = {
   requestData: string;
   stackTrace?: string | null;
   errorMessage: string;
-  createdBy?: string | null;
+  createdBy: string | null;
 };
 
 export const logErrorToDB = async ({

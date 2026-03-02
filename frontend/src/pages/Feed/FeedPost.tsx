@@ -18,7 +18,7 @@ import { toast } from "@/hooks/use-toast";
 import { blockUser } from "@/lib/api/user.api";
 
 function FeedPost({ post }) {
- 
+
   const navigate = useNavigate();
   const toggleLike = usePostStore((s) => s.toggleLike);
   const blockPostAction = usePostStore((s) => s.blockPost);
@@ -26,6 +26,11 @@ function FeedPost({ post }) {
   const [showComments, setShowComments] = useState(false);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [isReporting, setIsReporting] = useState(false);
+  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+  const deleteFlow = useDeletePost();
+  const { profile } = useProfileStore();
+  const initials = (post.user.firstName?.[0] ?? "") + (post.user.lastName?.[0] ?? "");
+  const isOwner = post.user.userId === profile?.id;
 
 
   const handleReport = async (reason: string) => {
@@ -43,23 +48,21 @@ function FeedPost({ post }) {
   };
 
   const handleBlockUser = async () => {
-    if (window.confirm(`Are you sure you want to block ${post.user.firstName}? You will no longer see their posts.`)) {
-      try {
-        await blockUser({ user_blocked: post.user.userId, is_blocking: true });
-        toast({
-          title: "User blocked successfully",
-          description: `You will no longer see posts from ${post.user.firstName}`,
-        });
-        usePostStore.getState().fetchPosts(true);
+    try {
+      await blockUser({ user_blocked: post.user.userId, is_blocking: true });
+      toast({
+        title: "User blocked successfully",
+        description: `You will no longer see posts from ${post.user.firstName}`,
+      });
+      usePostStore.getState().fetchPosts(true);
 
-      } catch (e) {
-        console.error(e);
-        toast({
-          title: "Failed to block user",
-          description: "Please try again",
-          variant: "destructive",
-        });
-      }
+    } catch (e) {
+      console.error(e);
+      toast({
+        title: "Failed to block user",
+        description: "Please try again",
+        variant: "destructive",
+      });
     }
   };
 
@@ -79,21 +82,18 @@ function FeedPost({ post }) {
     setShowComments(true);
   }, []);
 
-  const deleteFlow = useDeletePost();
-  const { profile } = useProfileStore();
-  const initials = (post.user.firstName?.[0] ?? "") + (post.user.lastName?.[0] ?? "");
-  const isOwner = post.user.userId === profile?.id;
+
 
   return (
     <article
-      className="bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
+      className="bg-card rounded-2xl my-3 border border-border shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
     >
       {/* Header */}
-      <div onClick={handleProfile} className="flex items-start justify-between p-5 pb-3 cursor-pointer">
-        <div className="flex gap-3">
+      <div className="flex items-start justify-between p-5 pb-3 ">
+        <div className="flex gap-3 cursor-pointer" onClick={handleProfile}>
           <Avatar className="w-11 h-11 shrink-0 ">
             {post.user.profile_image_url ? (
-              <AvatarImage   src={post.user.profile_image_url} />
+              <AvatarImage src={post.user.profile_image_url} />
             ) : null}
             <AvatarFallback className="bg-primary/10 text-primary font-medium">
               {initials.toUpperCase() || "U"}
@@ -103,7 +103,7 @@ function FeedPost({ post }) {
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-foreground">{post.user.firstName + " " + post.user.lastName}</span>
-             
+
             </div>
             <span className="text-xs text-muted-foreground">
               {formatPostDate(post.createdAt)}
@@ -148,7 +148,7 @@ function FeedPost({ post }) {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
-                  onClick={handleBlockUser}
+                  onClick={() => setBlockDialogOpen(true)}
                 >
                   <User className="w-4 h-4" />
                   Block User
@@ -167,7 +167,7 @@ function FeedPost({ post }) {
       )}
 
       {/* Images */}
-      <PostMediaGrid  images={imageUrls} />
+      <PostMediaGrid images={imageUrls} />
 
       {/* Actions */}
       <div className="flex items-center gap-1 px-4 py-2 border-t border-border">
@@ -202,6 +202,19 @@ function FeedPost({ post }) {
           confirmVariant="destructive"
           loading={deleteFlow.loading}
           onConfirm={deleteFlow.confirm}
+        />
+        <ConfirmDialog
+          open={blockDialogOpen}
+          onOpenChange={
+            async () => {
+              setBlockDialogOpen(false);
+            }}
+          title="Block User?"
+          description={`Are you sure you want to block ${post.user.firstName}? You will no longer see their posts.`}
+          confirmText="Block"
+          confirmVariant="destructive"
+          loading={false}
+          onConfirm={handleBlockUser}
         />
 
       </div>

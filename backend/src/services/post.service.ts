@@ -371,6 +371,7 @@ export const searchPosts = async (searchQuery: string, userId: string, limit: nu
       user: {
         userId: post.user_id,
         firstName: post.user_firstname || '',
+        profile_image_url: post.profile_image_url || null,
         lastName: post.user_lastname || '',
         username: post.user_username || ''
       },

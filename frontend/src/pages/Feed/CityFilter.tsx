@@ -25,6 +25,12 @@ export function CityFilter() {
     const [citySearch, setCitySearch] = useState("");
     const [isLoading, setIsLoading] = useState(false);
 
+    useEffect(() => {
+        if (citySearch) {
+            fetchCities(citySearch);
+        }
+    }, [citySearch]);
+
     // Simple debounce implementation since lodash might not be consistently available
     const fetchCities = useCallback(async (search: string) => {
         setIsLoading(true);
@@ -38,35 +44,37 @@ export function CityFilter() {
         }
     }, []);
 
-    useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            fetchCities(citySearch);
-        }, 500);
-        return () => clearTimeout(timeoutId);
-    }, [citySearch, fetchCities]);
-
     const handleClear = () => {
         setSelectedCity("");
         setCitySearch("");
     };
 
+    const handleOpenChange = (open: boolean) => {
+        setOpen(open);
+        if (open) {
+            setTimeout(() => {
+                fetchCities(citySearch);
+            }, 500);
+        }
+    };
+
     return (
         <div className="flex items-center gap-2">
-            <Popover open={open} onOpenChange={setOpen}>
+            <Popover open={open} onOpenChange={handleOpenChange}>
                 <PopoverTrigger asChild>
                     <Button
                         variant="secondary"
                         role="combobox"
                         aria-expanded={open}
-                        className=" group w-full md:w-[240px]  text-muted-foreground hover:text-white  hover:bg-primary/90  justify-between font-normal pl-3"
+                        className=" group w-full md:w-[240px]  text-muted-foreground hover:text-white  hover:bg-primary/90  border border-gray-200 justify-between font-normal pl-3"
                     >
                         <div className="flex items-center gap-2 ">
-                            <MapPin className="h-4 w-4  text-muted-foreground   shrink-0 group-hover:text-white transition-colors" />
-                            <span className="truncate text-black">
+                            <MapPin className="h-4 w-4 shrink-0 group-hover:text-white transition-colors" />
+                            <span>
                                 {selectedCity || "Filter by City"}
                             </span>
                         </div>
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50 cursor-pointer" />
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[300px] p-0 z-0"  side='bottom' avoidCollisions={false} align="start">
@@ -95,6 +103,7 @@ export function CityFilter() {
                                             setSelectedCity(city.name);
                                             setOpen(false);
                                         }}
+                                        className="cursor-pointer"
                                     >
                                         <Check
                                             className={cn(

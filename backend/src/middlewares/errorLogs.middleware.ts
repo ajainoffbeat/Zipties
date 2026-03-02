@@ -13,22 +13,24 @@ export const errorLogs = async (
   try {
     if (err instanceof Error) {
       const action = `${req.method} ${req.originalUrl}`;
-        const token = extractBearerToken(req.headers.authorization);
-    const {userId} = decodeToken(token);
-
       const requestData = JSON.stringify({
         params: req.params,
         query: req.query,
         body: { ...req.body, password: undefined },
       });
-      await EmailService.sendExceptionEmail(err.message, action,err.stack?? "N\A");
+      let userId = null;
+      if (req.headers.authorization) {
+        const token = extractBearerToken(req.headers.authorization);
+        userId = decodeToken(token).userId;
+      }
       await logErrorToDB({
         action,
         requestData,
         stackTrace: err.stack ?? null,
         errorMessage: err.message,
-        createdBy: userId ?? null,
+        createdBy: userId,
       });
+      await EmailService.sendExceptionEmail(err.message, action, err.stack ?? "N/A");
     }
   } catch (e) {
     logger.error("ErrorLogs middleware failed", { error: e });

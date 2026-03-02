@@ -4,22 +4,20 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { usePostStore } from "@/store/usePostStore";
 import { cn } from "@/lib/utils/utils";
+import FeedPost from "@/pages/Feed/FeedPost"; 
 
-// Dynamic import to avoid circular dependency
-const FeedPost = lazy(() => import("@/pages/Feed/FeedPost").then(module => ({ default: module.default })));
-
-export function PostSearch() {
+export function PostSearch({ isSearchActive, setIsSearchActive }: { isSearchActive: boolean; setIsSearchActive: (active: boolean) => void }) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [isSearchActive, setIsSearchActive] = useState(false);
+
   const inputRef = useRef<HTMLInputElement>(null);
-  
-  const { 
-    searchPosts, 
-    searchResults, 
-    isSearching, 
-    searchPagination, 
+
+  const {
+    searchPosts,
+    searchResults,
+    isSearching,
+    searchPagination,
     clearSearch,
-    searchQuery: storeSearchQuery 
+    searchQuery: storeSearchQuery
   } = usePostStore();
 
   const handleSearch = useCallback(async (query: string) => {
@@ -28,7 +26,7 @@ export function PostSearch() {
       setIsSearchActive(false);
       return;
     }
-    
+
     setIsSearchActive(true);
     await searchPosts(query.trim(), true);
   }, [searchPosts, clearSearch]);
@@ -36,7 +34,7 @@ export function PostSearch() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchQuery(value);
-    
+
     // Debounce search
     const timeoutId = setTimeout(() => {
       handleSearch(value);
@@ -62,7 +60,7 @@ export function PostSearch() {
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const element = e.currentTarget;
     const { scrollTop, scrollHeight, clientHeight } = element;
-    
+
     if (scrollHeight - scrollTop <= clientHeight * 1.5) {
       loadMoreSearchResults();
     }
@@ -81,7 +79,7 @@ export function PostSearch() {
           onChange={handleInputChange}
           className={cn(
             "pl-10 pr-10 transition-all duration-200",
-            isSearchActive && "ring-2 ring-primary/20"
+            "ring-2 ring-primary/20"
           )}
         />
         {searchQuery && (
@@ -125,7 +123,7 @@ export function PostSearch() {
               <span className="ml-3 text-muted-foreground">Searching posts...</span>
             </div>
           ) : searchResults.length > 0 ? (
-            <div 
+            <div
               className="space-y-6"
               onScroll={handleScroll}
             >
@@ -134,7 +132,7 @@ export function PostSearch() {
                   <FeedPost post={post} />
                 </Suspense>
               ))}
-              
+
               {/* Load More */}
               {searchPagination.hasMore && (
                 <div className="text-center py-6">
