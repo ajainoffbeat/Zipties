@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils/utils";
 import { useProfileStore } from "@/store/useProfileStore";
 import { usePostComposer } from "@/hooks/usePostComposer";
 import { useImageHandler } from "@/hooks/useImageHandler";
+import { toast } from "@/hooks/use-toast";
+import { array } from "zod";
 
 export default function CreatePostCard() {
   const { profile } = useProfileStore();
@@ -16,6 +18,32 @@ export default function CreatePostCard() {
   const charLimit = 200;
   const isOverLimit = charCount > charLimit;
 
+
+  const imageTypeHandler = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const files = Array.from(e.target.files ?? []);
+
+  const allowedTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+  ];
+
+  if (files.some((file: File) => !allowedTypes.includes(file.type))) {
+    toast({
+      title: "Invalid image format",
+      description: "Only jpg, jpeg, png, webp, gif allowed",
+      variant: "destructive",
+    });
+     //reset  input  after error
+    e.target.value = "";
+    return;
+  }
+   
+  images.readFiles(files);
+  //reset input after adding succes
+//  e.target.value = "";
+};
   return (
     <div className={cn(
       "bg-card rounded-2xl border shadow-sm overflow-hidden transition-colors duration-200",
@@ -120,10 +148,8 @@ export default function CreatePostCard() {
             accept="image/*"
             multiple
             className="hidden"
-            onChange={(e) => {
-              if (e.target.files) images.readFiles(e.target.files);
-              e.target.value = "";
-            }}
+            onChange={imageTypeHandler}
+            
           />
           <Button
             variant="ghost"
