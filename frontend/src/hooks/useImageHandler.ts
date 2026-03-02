@@ -1,6 +1,9 @@
 import { useRef, useState } from "react";
+import { useToast } from "@/components/ui/use-toast";
 
 export function useImageHandler() {
+  const { toast } = useToast();
+
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -9,10 +12,22 @@ export function useImageHandler() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const readFiles = (incoming: FileList | File[]) => {
+    const maxSize = 2 * 1024 * 1024; // 2MB
+
     Array.from(incoming).forEach((file) => {
       if (!file.type.startsWith("image/")) return;
 
+      if (file.size > maxSize) {
+        toast({
+          title: "File too large",
+          description: `The Selected file size  must be under 2MB.`,
+          variant: "destructive",
+        });
+        return; // skip this file
+      }
+
       setFiles((f) => [...f, file]);
+
       const reader = new FileReader();
       reader.onload = (e) =>
         setPreviews((p) => [...p, e.target?.result as string]);
@@ -26,7 +41,6 @@ export function useImageHandler() {
   };
 
   const remove = (index: number) => {
-    // Check if this is an existing image (has an asset ID)
     const assetId = existingAssetIds[index];
     if (assetId) {
       setRemovedAssetIds((prev) => [...prev, assetId]);

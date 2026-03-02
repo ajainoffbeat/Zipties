@@ -18,7 +18,7 @@ const app: Application = express();
 
 app.use(
   cors({
-    origin: ["http://zipties-frontend-bucket.s3-website-us-east-1.amazonaws.com", "http://localhost:8080", "http://localhost:5173"],
+    origin: ["http://zipties-frontend-bucket.s3-website-us-east-1.amazonaws.com", "http://localhost:8081", "http://localhost:5173"],
     credentials: true,
   })
 );

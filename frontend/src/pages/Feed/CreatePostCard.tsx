@@ -34,8 +34,8 @@ export default function CreatePostCard() {
     >
       <div className="p-5">
         <div className="flex gap-4">
-          <Avatar className="w-11 h-11 shrink-0">
-            <AvatarImage src={profile?.profile_image_url} />
+          <Avatar className="w-11 h-11 shrink-0 ">
+            <AvatarImage   src={profile?.profile_image_url} />
             <AvatarFallback className="bg-primary/10 text-primary font-medium">
               {profile?.first_name?.[0]?.toUpperCase() ?? "U"}
             </AvatarFallback>

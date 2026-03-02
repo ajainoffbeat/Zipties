@@ -71,6 +71,10 @@ function FeedPost({ post }) {
     [post.assets]
   );
 
+  const handleProfile = () => {
+    navigate(`/profile/${post.user.userId}`)
+  }
+
   const handleCommentClick = useCallback(() => {
     setShowComments(true);
   }, []);
@@ -85,11 +89,11 @@ function FeedPost({ post }) {
       className="bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
     >
       {/* Header */}
-      <div className="flex items-start justify-between p-5 pb-3">
+      <div onClick={handleProfile} className="flex items-start justify-between p-5 pb-3 cursor-pointer">
         <div className="flex gap-3">
-          <Avatar className="w-11 h-11 shrink-0">
+          <Avatar className="w-11 h-11 shrink-0 ">
             {post.user.profile_image_url ? (
-              <AvatarImage src={post.user.profile_image_url} />
+              <AvatarImage   src={post.user.profile_image_url} />
             ) : null}
             <AvatarFallback className="bg-primary/10 text-primary font-medium">
               {initials.toUpperCase() || "U"}
@@ -99,7 +103,7 @@ function FeedPost({ post }) {
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-foreground">{post.user.firstName + " " + post.user.lastName}</span>
-              <span className="text-muted-foreground text-sm">@{post.user.username}</span>
+             
             </div>
             <span className="text-xs text-muted-foreground">
               {formatPostDate(post.createdAt)}
@@ -163,7 +167,7 @@ function FeedPost({ post }) {
       )}
 
       {/* Images */}
-      <PostMediaGrid images={imageUrls} />
+      <PostMediaGrid  images={imageUrls} />
 
       {/* Actions */}
       <div className="flex items-center gap-1 px-4 py-2 border-t border-border">

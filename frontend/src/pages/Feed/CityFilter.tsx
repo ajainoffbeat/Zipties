@@ -55,21 +55,21 @@ export function CityFilter() {
             <Popover open={open} onOpenChange={setOpen}>
                 <PopoverTrigger asChild>
                     <Button
-                        variant="outline"
+                        variant="secondary"
                         role="combobox"
                         aria-expanded={open}
-                        className="w-full md:w-[240px] justify-between font-normal pl-3"
+                        className=" group w-full md:w-[240px]  text-muted-foreground hover:text-white  hover:bg-primary/90  justify-between font-normal pl-3"
                     >
-                        <div className="flex items-center gap-2 truncate">
-                            <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                            <span className="truncate">
+                        <div className="flex items-center gap-2 ">
+                            <MapPin className="h-4 w-4  text-muted-foreground   shrink-0 group-hover:text-white transition-colors" />
+                            <span className="truncate text-black">
                                 {selectedCity || "Filter by City"}
                             </span>
                         </div>
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0" align="start">
+                <PopoverContent className="w-[300px] p-0 z-0"  side='bottom' avoidCollisions={false} align="start">
                     <Command shouldFilter={false}>
                         <CommandInput
                             placeholder="Search city..."
