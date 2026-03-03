@@ -21,7 +21,7 @@ function FeedPost({ post }) {
 
   const navigate = useNavigate();
   const toggleLike = usePostStore((s) => s.toggleLike);
-  const blockPostAction = usePostStore((s) => s.blockPost);
+
   const reportPostAction = usePostStore((s) => s.reportPost);
   const [showComments, setShowComments] = useState(false);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
@@ -32,6 +32,10 @@ function FeedPost({ post }) {
   const initials = (post.user.firstName?.[0] ?? "") + (post.user.lastName?.[0] ?? "");
   const isOwner = post.user.userId === profile?.id;
 
+
+const handleLike = async () => {
+  await toggleLike(post.postId);
+};
 
   const handleReport = async (reason: string) => {
     setIsReporting(true);
@@ -174,7 +178,7 @@ function FeedPost({ post }) {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => toggleLike(post.postId)}
+          onClick={handleLike}
           className={cn(
             "text-muted-foreground hover:text-primary hover:bg-rose-500/10 transition-colors",
             post.isLiked && "text-primary"

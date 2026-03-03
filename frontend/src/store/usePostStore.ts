@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { createPost as createPostApi, getPosts as getPostsApi, getPost as getPostApi, deletePost as deletePostApi, editPost as editPostApi, togglePostLike as togglePostLikeApi, getPostComments as getPostCommentsApi, createPostComment as createPostCommentApi, searchPosts as searchPostsApi, blockPost as blockPostApi, reportPost as reportPostApi } from "@/lib/api/post.api";
+import { toast } from "@/hooks/use-toast";
 
 /* ── Types mirroring the backend PostResponse ── */
 export interface PostAsset {
@@ -107,7 +108,13 @@ export const usePostStore = create<PostState>((set, get) => ({
 
         try {
             const response = await togglePostLikeApi(postId);
-
+            if (response.success == false) {
+                toast({
+                    title: "You're blocked by the author",
+                    description: "You cannot like this post.",
+                    variant: "default",
+                });
+            }
             set((state) => ({
                 posts: state.posts.map((p) => {
                     if (p.postId !== postId) return p;
@@ -330,7 +337,13 @@ export const usePostStore = create<PostState>((set, get) => ({
         }));
 
         try {
-            await createPostCommentApi(postId, comment);
+            const response = await createPostCommentApi(postId, comment);
+            if (response.success == false) {
+                toast({
+                    title: "You're blocked by the author",
+                    description: "You cannot comment on this post.",
+                });
+            }
         } catch (err: any) {
             // Revert optimistic update on error
             set((state) => ({
