@@ -9,7 +9,7 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   useSocketNotifications();
   return (
-    <div className="min-h-screen bg-background ">
+    <div className="min-h-screen bg-background">
       <Navbar />
       <main className="pt-16">{children}</main>
       <Footer />

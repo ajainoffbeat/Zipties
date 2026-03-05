@@ -59,7 +59,7 @@ export default function EditPostForm({
       {/* Form */}
       <div
         className={cn(
-          "bg-card rounded-3xl border shadow-lg overflow-hidden",
+          "bg-card rounded-3xl border shadow-lg overflow-hidden mb-[150px]",
           isDragging && "border-primary/60"
         )}
         onDragOver={(e) => {

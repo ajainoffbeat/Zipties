@@ -44,7 +44,7 @@ export default function AuthPage() {
 
   return (
     <>
-      <div className="min-h-[90vh] bg-background flex ">
+      <div className="min-h-[91vh] bg-background flex ">
         <div className="flex-1 flex flex-col justify-center px-8 md:px-16 lg:px-24 p-5">
           <div className="max-w-md w-full mx-auto">
             <div className="mb-4">

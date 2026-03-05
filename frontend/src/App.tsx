@@ -48,7 +48,6 @@ const App = () => {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Auth />} />
-            {/* <Route path="/login" element={<Auth />} /> */}
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />

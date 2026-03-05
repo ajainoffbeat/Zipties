@@ -2,11 +2,15 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import CreatePostCard from "@/pages/Feed/CreatePostCard";
 import FeedList from "@/pages/Feed/FeedList";
 import { PostSearch } from "@/components/search/PostSearch";
-import { CityFilter } from "@/pages/Feed/CityFilter";
+import { CityFilter } from "@/components/CityDropdown/CityFilter";
 import { useState } from "react";
+import { usePostStore } from "@/store/usePostStore";
+import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 
 export default function FeedPage() {
   const [isSearchActive, setIsSearchActive] = useState(false);
+  const { selectedCity, setSelectedCity } = usePostStore();
 
   return (
     <AppLayout>
@@ -24,8 +28,26 @@ export default function FeedPage() {
           </div>
 
           <div className="md:w-60">
-            <CityFilter />
+            <CityFilter
+              value={selectedCity}
+              placeholder={selectedCity || "Filter posts by city"}
+              width="w-[240px]"
+              onSelect={(city) => {
+                setSelectedCity(city.name);
+              }}
+            />
           </div>
+          {selectedCity && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSelectedCity("")}
+              className="text-muted-foreground hover:text-white"
+              title="Clear filter"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          )}
         </div>
 
         {!isSearchActive && (

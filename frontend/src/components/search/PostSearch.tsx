@@ -109,7 +109,7 @@ export function PostSearch({ isSearchActive, setIsSearchActive }: { isSearchActi
               variant="ghost"
               size="sm"
               onClick={handleClearSearch}
-              className="text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-white"
             >
               <X className="w-4 h-4 mr-1" />
               Clear
@@ -161,7 +161,7 @@ export function PostSearch({ isSearchActive, setIsSearchActive }: { isSearchActi
                 No posts match "{searchQuery}". Try searching with different keywords.
               </p>
               <Button
-                variant="outline"
+                variant="secondary"
                 onClick={handleClearSearch}
                 className="text-muted-foreground hover:text-foreground"
               >
