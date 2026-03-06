@@ -47,7 +47,24 @@ export const deleteFromS3 = async (fileUrl: string) => {
   if (!env.AWS_S3_BUCKET_NAME) {
     throw new AppError(500, "AWS S3 Bucket Name is not configured");
   }
-  const fileKey = fileUrl.split(".amazonaws.com/")[1];
+
+  // Extract the key from different possible URL formats
+  let fileKey: string;
+  
+  if (fileUrl.includes(".amazonaws.com/")) {
+    fileKey = fileUrl.split(".amazonaws.com/")[1];
+  } else if (fileUrl.includes("/")) {
+    // If it's a relative path or different format, extract everything after the first /
+    const urlParts = fileUrl.split("/");
+    fileKey = urlParts.slice(1).join("/");
+  } else {
+    // If it's just the key itself
+    fileKey = fileUrl;
+  }
+
+  if (!fileKey) {
+    throw new AppError(400, "Invalid file URL - cannot extract S3 key");
+  }
 
   try {
     const command = new DeleteObjectCommand({

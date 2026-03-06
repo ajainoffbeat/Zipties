@@ -1,4 +1,4 @@
-import LegalPage from "@/pages/LegalPage";
+import LegalPage from "@/pages/Legal/LegalPage";
 import { aboutUsContent } from "@/lib/utils/legalContent";
 
 export default function AboutUs() {

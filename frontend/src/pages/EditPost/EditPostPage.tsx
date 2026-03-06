@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { usePostStore } from "@/store/usePostStore";
 import { useImageHandler } from "@/hooks/useImageHandler";
-import EditPostForm from "./EditPostForm";
+import EditPostForm from "../../components/EditPost/EditPostForm";
 import { useEditPost } from "@/hooks/useEditPost";
 
 export default function EditPostPage() {

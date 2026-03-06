@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { createPost as createPostApi, getPosts as getPostsApi, getPost as getPostApi, deletePost as deletePostApi, editPost as editPostApi, togglePostLike as togglePostLikeApi, getPostComments as getPostCommentsApi, createPostComment as createPostCommentApi, searchPosts as searchPostsApi, blockPost as blockPostApi, reportPost as reportPostApi } from "@/lib/api/post.api";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/useToast";
 
 /* ── Types mirroring the backend PostResponse ── */
 export interface PostAsset {

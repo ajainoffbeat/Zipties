@@ -31,7 +31,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useProfileStore } from "@/store/useProfileStore";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { blockUser } from "@/lib/api/user.api";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/useToast";
 import { containsProfanity } from "@/lib/utils/profanity";
 import { encryptMessage, decryptMessage } from "@/lib/utils/encryption";
 import { MessagesSkeleton } from "@/components/skeletons/MessagesSkeleton";

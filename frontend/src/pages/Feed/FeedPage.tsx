@@ -1,6 +1,6 @@
 import { AppLayout } from "@/components/layout/AppLayout";
-import CreatePostCard from "@/pages/Feed/CreatePostCard";
-import FeedList from "@/pages/Feed/FeedList";
+import CreatePostCard from "@/components/CreatePost/CreatePostCard";
+import FeedList from "@/components/PostList/FeedList";
 import { PostSearch } from "@/components/search/PostSearch";
 import { CityFilter } from "@/components/CityDropdown/CityFilter";
 import { useState } from "react";

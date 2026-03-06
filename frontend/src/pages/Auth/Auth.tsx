@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import { authSchema, AuthFormValues } from "@/lib/validators/auth.schema";
 import logo2 from "@/assets/logo.png";
-import { Footer } from "../Footer";
 import { useAuthForm } from "@/hooks/useAuthForm";
+import { AuthLayout } from "@/components/layout/AuthLayout";
 
 export default function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -44,202 +44,185 @@ export default function AuthPage() {
 
   return (
     <>
-      <div className="min-h-[91vh] bg-background flex ">
-        <div className="flex-1 flex flex-col justify-center px-8 md:px-16 lg:px-24 p-5">
-          <div className="max-w-md w-full mx-auto">
-            <div className="mb-4">
-              {
-                isLogin && (
-                  <img src={logo2} className="mb-5" width={35} height={35} />
-                )
-              }
-              <h1 className="text-3xl font-bold mb-2">
-                {isLogin ? "Welcome back" : "Create your account"}
-              </h1>
+      <AuthLayout
+        logo={logo2}
+        title="Join the Community"
+        description="Connect, collaborate, and build together."
+      >
+        <div className="mb-4">
+          {
+            isLogin && (
+              <img src={logo2} className="mb-5" width={35} height={35} />
+            )
+          }
+          <h1 className="text-3xl font-bold mb-2">
+            {isLogin ? "Welcome back" : "Create your account"}
+          </h1>
 
-              <p className="text-muted-foreground">
-                {isLogin
-                  ? "Sign in to continue"
-                  : "Join thousands of community members"}
-              </p>
+          <p className="text-muted-foreground">
+            {isLogin
+              ? "Sign in to continue"
+              : "Join thousands of community members"}
+          </p>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-2" noValidate>
+
+          {!isLogin && (
+            <div className="space-y-1">
+              <Label>Full Name</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  {...register("fullName")}
+                  placeholder="John Doe"
+                  className="pl-10 h-12"
+                />
+              </div>
+              {errors.fullName && (
+                <p className="text-sm text-destructive">
+                  {errors.fullName.message}
+                </p>
+              )}
             </div>
+          )}
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-2" noValidate>
+          <div className="space-y-1">
+            <Label>Email</Label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Input
+                type="email"
+                {...register("email")}
+                placeholder="you@example.com"
+                className="pl-10 h-12"
+              />
+            </div>
+            {errors.email && (
+              <p className="text-sm text-destructive">
+                {errors.email.message}
+              </p>
+            )}
+          </div>
 
-              {!isLogin && (
-                <div className="space-y-1">
-                  <Label>Full Name</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                    <Input
-                      {...register("fullName")}
-                      placeholder="John Doe"
-                      className="pl-10 h-12"
-                    />
-                  </div>
-                  {errors.fullName && (
-                    <p className="text-sm text-destructive">
-                      {errors.fullName.message}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              <div className="space-y-1">
-                <Label>Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    type="email"
-                    {...register("email")}
-                    placeholder="you@example.com"
-                    className="pl-10 h-12"
-                  />
-                </div>
-                {errors.email && (
-                  <p className="text-sm text-destructive">
-                    {errors.email.message}
-                  </p>
-                )}
-              </div>
-
-              {/* Password */}
-              <div className="space-y-1">
-                <Label>Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    {...register("password")}
-                    placeholder="••••••••"
-                    className="pl-10 pr-10 h-12"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2"
-                  >
-                    {showPassword ? <EyeOff /> : <Eye />}
-                  </button>
-                </div>
-
-                {errors.password && (
-                  <p className="text-sm text-destructive">
-                    {errors.password.message}
-                  </p>
-                )}
-              </div>
-
-              {!isLogin && (
-                <div className="space-y-1">
-                  <Label>Confirm Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                    <Input
-                      type={showConfirmPassword ? "text" : "password"}
-                      {...register("confirmPassword")}
-                      placeholder="••••••••"
-                      className="pl-10 pr-10 h-12"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2"
-                    >
-                      {showConfirmPassword ? <EyeOff /> : <Eye />}
-                    </button>
-                  </div>
-
-                  {errors.confirmPassword && (
-                    <p className="text-sm text-destructive">
-                      {errors.confirmPassword.message}
-                    </p>
-                  )}
-                </div>
-              )
-              }
-              {isLogin && (
-                <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="h-4 w-4 ml-1 rounded border-muted-foreground text-primary focus:ring-primary cursor-pointer accent-primary"
-                    />
-                    <span className="text-sm text-muted-foreground">
-                      Remember me
-                    </span>
-                  </label>
-
-                  {isLogin && (
-                    <button
-                      type="button"
-                      onClick={() => navigate("/forgot-password")}
-                      className="text-sm text-primary hover:underline"
-                    >
-                      Forgot password?
-                    </button>
-                  )}
-                </div>
-              )
-              }
-              {!isLogin && (
-                <label className="flex justify-center items-center gap-2 text-sm text-muted-foreground ml-1">
-                  <span>
-                    By creating an account, you agree to our {" "}
-
-                    <Link to="/terms" className="text-primary hover:underline">
-                      Terms of Service
-                    </Link>{" "}
-                    and{" "}
-                    <Link to="/privacy-policy" className="text-primary hover:underline">
-                      Privacy Policy
-                    </Link>
-                  </span>
-                </label>
-              )}
-              <Button
-                type="submit"
-                variant="hero"
-                size="lg"
-                className="w-full"
-                disabled={loginPending || signupPending}
-              >
-                {isLogin ? "Sign In" : "Create Account"}
-              </Button>
-            </form>
-
-            <p className="text-center mt-4 text-muted-foreground">
-              {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
+          {/* Password */}
+          <div className="space-y-1">
+            <Label>Password</Label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Input
+                type={showPassword ? "text" : "password"}
+                {...register("password")}
+                placeholder="••••••••"
+                className="pl-10 pr-10 h-12"
+              />
               <button
                 type="button"
-                onClick={() => toggleMode(setValue, clearErrors)}
-                className="text-primary text-sm hover:underline "
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2"
               >
-                {isLogin ? "Sign up" : "Sign in"}
+                {showPassword ? <EyeOff /> : <Eye />}
               </button>
-            </p>
-          </div>
-        </div>
-        <div className="hidden lg:flex flex-1 bg-gradient-hero items-center justify-center p-16 relative overflow-hidden">
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute top-1/4 right-1/4 w-64 h-64 bg-primary-foreground/10 rounded-full blur-3xl" />
-            <div className="absolute bottom-1/4 left-1/4 w-80 h-80 bg-primary-foreground/5 rounded-full blur-3xl" />
+            </div>
+
+            {errors.password && (
+              <p className="text-sm text-destructive">
+                {errors.password.message}
+              </p>
+            )}
           </div>
 
-          <div className="relative text-center text-primary-foreground max-w-lg">
-            <div className="w-20 h-20 rounded-2xl bg-primary-foreground/20 flex items-center justify-center mx-auto mb-8 animate-float">
-              <img src={logo2} className="w-16 h-16" alt="" />
+          {!isLogin && (
+            <div className="space-y-1">
+              <Label>Confirm Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  type={showConfirmPassword ? "text" : "password"}
+                  {...register("confirmPassword")}
+                  placeholder="••••••••"
+                  className="pl-10 pr-10 h-12"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                >
+                  {showConfirmPassword ? <EyeOff /> : <Eye />}
+                </button>
+              </div>
+
+              {errors.confirmPassword && (
+                <p className="text-sm text-destructive">
+                  {errors.confirmPassword.message}
+                </p>
+              )}
             </div>
-            <h2 className="text-4xl font-bold mb-4">Join the Community</h2>
-            <p className="text-lg text-primary-foreground/80">
-              Connect, collaborate, and build together.
-            </p>
-          </div>
-        </div>
-      </div>
-      <Footer />
+          )
+          }
+          {isLogin && (
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 ml-1 rounded border-muted-foreground text-primary focus:ring-primary cursor-pointer accent-primary"
+                />
+                <span className="text-sm text-muted-foreground">
+                  Remember me
+                </span>
+              </label>
+
+              {isLogin && (
+                <button
+                  type="button"
+                  onClick={() => navigate("/forgot-password")}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Forgot password?
+                </button>
+              )}
+            </div>
+          )
+          }
+          {!isLogin && (
+            <label className="flex justify-center items-center gap-2 text-sm text-muted-foreground ml-1">
+              <span>
+                By creating an account, you agree to our {" "}
+
+                <Link to="/terms" className="text-primary hover:underline">
+                  Terms of Service
+                </Link>{" "}
+                and{" "}
+                <Link to="/privacy-policy" className="text-primary hover:underline">
+                  Privacy Policy
+                </Link>
+              </span>
+            </label>
+          )}
+          <Button
+            type="submit"
+            variant="hero"
+            size="lg"
+            className="w-full"
+            disabled={loginPending || signupPending}
+          >
+            {isLogin ? "Sign In" : "Create Account"}
+          </Button>
+        </form>
+
+        <p className="text-center mt-4 text-muted-foreground">
+          {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
+          <button
+            type="button"
+            onClick={() => toggleMode(setValue, clearErrors)}
+            className="text-primary text-sm hover:underline "
+          >
+            {isLogin ? "Sign up" : "Sign in"}
+          </button>
+        </p>
+      </AuthLayout>
+
     </>
   );
 }

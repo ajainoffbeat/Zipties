@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 type Props = {
     isSubmitting: boolean;
+    
 };
 
 export function ProfileActions({ isSubmitting }: Props) {

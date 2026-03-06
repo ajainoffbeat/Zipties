@@ -27,25 +27,25 @@ export function BasicInfoSection({ form, errors }: Props) {
         <div>
           <Label>First Name</Label>
           <Input {  ...register("firstName")} defaultValue={profile.first_name} />
-          {errors?.firstName && <p className="text-red-500">{errors.firstName.message}</p>}
+          <p className="text-red-500 text-sm mt-1" >{errors?.firstName?.message}</p>
         </div>
 
         <div>
           <Label>Last Name</Label>
           <Input {...register("lastName")} defaultValue={profile.last_name} />
-          {errors?.lastName && <p className="text-red-500">{errors.lastName.message}</p>}
+          <p className="text-red-500  text-sm mt-1">{errors?.lastName?.message}</p>
         </div>
 
         <div>
           <Label>Nickname</Label>
           <Input {...register("username")} defaultValue={profile.username} />
-          {errors.username && <p className="text-red-500">{errors.username.message}</p>}
+          <p className="text-red-500  text-sm mt-1">{errors?.username?.message}</p>
         </div>
 
         <div>
           <Label>Bio</Label>
           <Input {...register("bio")} defaultValue={profile.bio} />
-          {errors.bio && <p className="text-red-500">{errors.bio.message}</p>}
+          <p className="text-red-500  text-sm mt-1">{errors?.bio?.message}</p>
         </div>
       </CardContent>
     </Card>

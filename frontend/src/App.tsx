@@ -9,19 +9,20 @@ import Feed from "./pages/Feed/FeedPage";
 // import Messages from "./pages/Messages";
 // import Proposals from "./pages/Proposals";
 // import Marketplace from "./pages/Marketplace";
-import Profile from "./pages/Profile";
-import EditProfile from "./pages/EditProfile";
+// import Profile from "./pages/Profile";
+import EditProfile from "./pages/EditProfile/EditProfile";
 import EditPost from "./pages/EditPost/EditPostPage";
 import NotFound from "./pages/NotFound";
-import ForgotPassword from "./pages/ForgotPassword";
+import ForgotPassword from "./pages/ForgotPassword/ForgotPassword";
 import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute";
-import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
-import TermsOfService from "./pages/legal/TermsOfService";
-import ResetPassword from "./pages/ResetPassword";
+import PrivacyPolicy from "@/components/legal/PrivacyPolicy";
+import TermsOfService from "@/components/legal/TermsOfService";
+import ResetPassword from "./pages/ResetPassword/ResetPassword";
 import Messages from "./pages/Messages";
 import { useAuthStore } from "./store/authStore";
 import { useEffect } from "react";
-import AboutUs from "@/pages/legal/AboutUs";
+import AboutUs from "@/components/legal/AboutUs";
+import Profile from "./pages/Profile/Profile";
 
 const queryClient = new QueryClient();
 

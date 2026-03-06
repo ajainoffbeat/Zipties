@@ -94,12 +94,14 @@ export const uploadAvatar = async (
     if (!(req as any).file) {
       throw new AppError(400, "No file uploaded");
     }
+    console.log("req in upload", req.file);
     const fileUrl = await uploadToS3((req as any).file,'avatars');
     const token = extractBearerToken(req.headers.authorization);
     const { userId } = decodeToken(token);
 
     const user = await userProfile(userId, userId);
     if (user?.profile_image_url) {
+      console.log("Attempting to delete old profile image:", user.profile_image_url);
       await deleteFromS3(user.profile_image_url);
     }
     const isUpdated = await updateUserProfile(userId, { profile_image_url: fileUrl });

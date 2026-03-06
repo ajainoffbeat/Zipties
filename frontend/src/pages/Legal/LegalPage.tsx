@@ -1,18 +1,6 @@
 import { Navbar } from "@/components/layout/Navbar";
-import { Footer } from "./Footer";
-
-type Section = {
-  email?: string;
-  heading: string;
-  content?: string;
-  list?: string[];
-};
-
-type LegalPageProps = {
-  title: string;
-  lastUpdated: string;
-  sections: Section[];
-};
+import { Footer } from "@/components/Footer/Footer";
+import { LegalPageProps } from "@/types/legal";
 
 export default function LegalPage({
   title,
@@ -37,16 +25,16 @@ export default function LegalPage({
                     {section.heading}
                   </h2>
 
-                  {section.content && <p>{section.content}    
-                  
-                  {section.email && (
-                    <a
-                      href={`mailto:${section.email}`}
-                      className="text-primary underline"
-                    >
-                      {section.email}
-                    </a>
-                  )}
+                  {section.content && <p>{section.content}
+
+                    {section.email && (
+                      <a
+                        href={`mailto:${section.email}`}
+                        className="text-primary underline"
+                      >
+                        {section.email}
+                      </a>
+                    )}
                   </p>}
 
                   {section.list && (
@@ -56,7 +44,7 @@ export default function LegalPage({
                       ))}
                     </ul>
                   )}
-                  
+
                 </section>
               ))}
             </div>

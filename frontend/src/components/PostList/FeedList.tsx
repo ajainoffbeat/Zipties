@@ -1,6 +1,6 @@
 import { Virtuoso } from "react-virtuoso";
 import { usePostStore } from "@/store/usePostStore";
-import FeedPost from "./FeedPost";
+import FeedPost from "../../pages/Feed/FeedPost";
 import PostSkeleton from "@/components/skeletons/PostSkeleton";
 import { useEffect } from "react";
 

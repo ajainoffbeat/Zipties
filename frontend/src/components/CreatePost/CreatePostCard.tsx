@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils/utils";
 import { useProfileStore } from "@/store/useProfileStore";
 import { usePostComposer } from "@/hooks/usePostComposer";
 import { useImageHandler } from "@/hooks/useImageHandler";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/useToast";
 import { array } from "zod";
 
 export default function CreatePostCard() {
@@ -20,30 +20,30 @@ export default function CreatePostCard() {
 
 
   const imageTypeHandler = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const files = Array.from(e.target.files ?? []);
+    const files = Array.from(e.target.files ?? []);
 
-  const allowedTypes = [
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/gif",
-  ];
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+    ];
 
-  if (files.some((file: File) => !allowedTypes.includes(file.type))) {
-    toast({
-      title: "Invalid image format",
-      description: "Only jpg, jpeg, png, webp, gif allowed",
-      variant: "destructive",
-    });
-     //reset  input  after error
-    e.target.value = "";
-    return;
-  }
-   
-  images.readFiles(files);
-  //reset input after adding succes
-//  e.target.value = "";
-};
+    if (files.some((file: File) => !allowedTypes.includes(file.type))) {
+      toast({
+        title: "Invalid image format",
+        description: "Only jpg, jpeg, png, webp, gif allowed",
+        variant: "destructive",
+      });
+      //reset  input  after error
+      e.target.value = "";
+      return;
+    }
+
+    images.readFiles(files);
+    //reset input after adding succes
+    //  e.target.value = "";
+  };
   return (
     <div className={cn(
       "bg-card rounded-2xl border shadow-sm overflow-hidden transition-colors duration-200",
@@ -63,7 +63,7 @@ export default function CreatePostCard() {
       <div className="p-5">
         <div className="flex gap-4">
           <Avatar className="w-11 h-11 shrink-0 ">
-            <AvatarImage   src={profile?.profile_image_url} />
+            <AvatarImage src={profile?.profile_image_url} />
             <AvatarFallback className="bg-primary/10 text-primary font-medium">
               {profile?.first_name?.[0]?.toUpperCase() ?? "U"}
             </AvatarFallback>
@@ -74,14 +74,14 @@ export default function CreatePostCard() {
               placeholder="What's on your mind?"
               value={composer.text}
               onChange={(e) => {
-                const value = e .target.value;
-                if(value.length <= 200){
-                 composer.setText(value)
-                }else {
-                  composer.setText(value.slice(0,200))
+                const value = e.target.value;
+                if (value.length <= 200) {
+                  composer.setText(value)
+                } else {
+                  composer.setText(value.slice(0, 200))
                 }
               }}
-              
+
               className="w-full bg-transparent border-none resize-none focus:outline-none text-foreground placeholder:text-muted-foreground min-h-[60px] text-[15px] leading-relaxed"
             />
 
@@ -149,7 +149,7 @@ export default function CreatePostCard() {
             multiple
             className="hidden"
             onChange={imageTypeHandler}
-            
+
           />
           <Button
             variant="ghost"

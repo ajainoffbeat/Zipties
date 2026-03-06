@@ -14,7 +14,7 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { InlineComments } from "@/components/comments/InlineComments";
 import { formatPostDate } from "@/lib/utils/formatTime";
 import { ReportPostDialog } from "@/components/feed/ReportPostDialog";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/useToast";
 import { blockUser } from "@/lib/api/user.api";
 
 function FeedPost({ post }) {
@@ -33,9 +33,9 @@ function FeedPost({ post }) {
   const isOwner = post.user.userId === profile?.id;
 
 
-const handleLike = async () => {
-  await toggleLike(post.postId);
-};
+  const handleLike = async () => {
+    await toggleLike(post.postId);
+  };
 
   const handleReport = async (reason: string) => {
     setIsReporting(true);

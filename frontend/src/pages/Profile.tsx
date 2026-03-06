@@ -8,131 +8,26 @@ import {
   Calendar,
   MessageCircle,
   UserPlus,
-
 } from "lucide-react";
-import { useProfileStore } from "@/store/useProfileStore";
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "@/store/authStore";
-import { blockUser } from "@/lib/api/user.api";
-import { useParams } from "react-router-dom";
-import { createConversation } from "@/lib/api/messages.api";
-import { useToast } from "@/components/ui/use-toast";
 import { ProfileSkeleton } from "@/components/skeletons/ProfileSkeleton";
-
 import { Ban } from "lucide-react";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
-import { usePostStore } from "@/store/usePostStore";
+import { useProfileActions } from "@/hooks/useUserProfile";
 
 export default function Profile() {
-  const { userId } = useParams();
-  const { profile, publicProfile, fetchProfileById, fetchMyProfile, loading, followUser, unfollowUser } = useProfileStore();
-  const navigate = useNavigate();
-  const loggedInUserId = useAuthStore((s) => s.userId);
-  const { toast } = useToast();
-  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
-  const [isBlocking, setIsBlocking] = useState(false);
-
-  useEffect(() => {
-    if (userId && userId !== loggedInUserId) {
-      fetchProfileById(userId);
-    }else{
-      fetchMyProfile(loggedInUserId);
-    }
-  }, [userId, loggedInUserId, fetchProfileById, fetchMyProfile]);
-
-
-  const displayProfile = userId && userId !== loggedInUserId ? publicProfile : profile;
-  const isOwnProfile = !userId || (userId === loggedInUserId);
-
-  const handleEditProfile = () => {
-    navigate("/edit-profile");
-  };
-
-  const handleMessage = async () => {
-    if (!displayProfile?.id || !loggedInUserId) return;
-
-    try {
-      const res = await createConversation([loggedInUserId, displayProfile.id]);
-      const conversationId = res.data.data.conversation_id;
-      navigate(`/messages?id=${conversationId}`, {
-        state: {
-          user: {
-            id: displayProfile.id,
-            name: `${displayProfile.first_name} ${displayProfile.last_name}`,
-            avatar: displayProfile.profile_image_url,
-            initials: `${displayProfile.first_name?.[0] || ""}${displayProfile.last_name?.[0] || ""}`.toUpperCase()
-          }
-        }
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to start conversation",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleBlockUser = async (isBlocked: boolean) => {
-    if (!displayProfile?.id) return;
-    setIsBlocking(true);
-    try {
-      await blockUser({ user_blocked: displayProfile.id, is_blocking: isBlocked });
-      toast({
-        title: isBlocked ? "User Blocked" : "User Unblocked",
-        description: isBlocked
-          ? `${displayProfile.first_name} has been blocked.`
-          : `${displayProfile.first_name} has been unblocked.`,
-      });
-      setBlockDialogOpen(false);
-      usePostStore.getState().fetchPosts(true);
-      navigate("/feed"); // Navigate away after blocking
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to block user.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsBlocking(false);
-    }
-  };
-
-  const handleFollow = async () => {
-    if (!displayProfile?.id) return;
-    try {
-      await followUser(displayProfile.id);
-      toast({
-        title: "Success",
-        description: `You are now following ${displayProfile.first_name}`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to follow user.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleUnfollow = async () => {
-    if (!displayProfile?.id) return;
-    try {
-      await unfollowUser(displayProfile.id);
-      toast({
-        title: "Success",
-        description: `You have unfollowed ${displayProfile.first_name}`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to unfollow user.",
-        variant: "destructive"
-      });
-    }
-  };
-
+  const {
+    loading,
+    displayProfile,
+    isOwnProfile,
+    blockDialogOpen,
+    setBlockDialogOpen,
+    isBlocking,
+    handleEditProfile,
+    handleMessage,
+    handleBlockUser,
+    handleFollow,
+    handleUnfollow,
+  } = useProfileActions();
 
   return (
     <AppLayout>
@@ -178,20 +73,20 @@ export default function Profile() {
                             Message
                           </Button>
                           {displayProfile?.is_following ? (
-                            <Button 
-                              variant="secondary" 
-                              size="sm" 
-                              className="gap-1 px-4" 
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="gap-1 px-4"
                               onClick={handleUnfollow}
                             >
                               <UserPlus className="w-4 h-4" />
                               Unfollow
                             </Button>
                           ) : (
-                            <Button 
-                              variant="default" 
-                              size="sm" 
-                              className="gap-1 px-4" 
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="gap-1 px-4"
                               onClick={handleFollow}
                             >
                               <UserPlus className="w-4 h-4" />
@@ -257,9 +152,9 @@ export default function Profile() {
                       Joined{" "}
                       {displayProfile?.joined_date
                         ? new Date(displayProfile.joined_date).toLocaleDateString("en-IN", {
-                            year: "numeric",
-                            month: "long",
-                          })
+                          year: "numeric",
+                          month: "long",
+                        })
                         : ""}
                     </span>
                   </div>

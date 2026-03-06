@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
 import { useAuth } from "@/hooks/useAuth";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/useToast";
 import { useAuthStore } from "@/store/authStore";
 import { useProfileStore } from "@/store/useProfileStore";
 import { AuthFormValues } from "@/lib/validators/auth.schema";

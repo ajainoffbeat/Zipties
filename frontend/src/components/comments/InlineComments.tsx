@@ -8,7 +8,7 @@ import { useInlineComments } from "@/hooks/useInlineComments";
 import { formatCommentTime } from "@/lib/utils/formatTime";
 import { ReportCommentDialog } from "./ReportCommentDialog";
 import { reportComment } from "@/lib/api/post.api";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/useToast";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,7 +49,7 @@ export function InlineComments({
 
   const handleReportComment = async (reason: string) => {
     if (!selectedCommentId) return;
-    
+
     setIsReporting(true);
     try {
       await reportComment(selectedCommentId, reason);
@@ -135,7 +135,7 @@ export function InlineComments({
                       {comment.comment}
                     </p>
                   </div>
-                  
+
                   {/* Report button - only show for other users' comments */}
                   {comment.user.id !== profile?.id && (
                     <DropdownMenu>
